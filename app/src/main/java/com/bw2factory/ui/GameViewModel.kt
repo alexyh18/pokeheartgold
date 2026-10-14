@@ -66,9 +66,12 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
         get() = state.takeIf { it.phase in setOf(Phase.RENTAL, Phase.PRE_BATTLE, Phase.SWAP) }
             ?.let { OpponentHint.of(data, it.round, it.opponent) }
 
-    /** BW2 battle background: the subway car stage (changing each train) or the boss's night stage. */
+    /**
+     * Battle Subway battle background: the arrow-platform subway stage. Each train uses a different
+     * time-of-day variant (facility_0..4); the boss uses the dusk variant (facility_3).
+     */
     private fun backgroundFor(s: FactoryState) =
-        if (isBoss) "head" else "facility_${s.round % 5}"
+        if (isBoss) "facility_3" else "facility_${s.round % 5}"
 
     fun chooseRentals(picks: List<Int>) = update(factory.chooseRentals(state, picks))
     fun reorder(order: List<Int>) = update(factory.reorder(state, order))

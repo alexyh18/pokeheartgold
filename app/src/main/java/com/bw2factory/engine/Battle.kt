@@ -105,6 +105,7 @@ class Battle(
         if (m.hasType(Types.FLYING)) return false
         if (ability(m) == Ab.LEVITATE) return false
         if (m.magnetRiseTurns > 0) return false
+        if (item(m) == It.AIR_BALLOON) return false
         return true
     }
 
@@ -1176,6 +1177,26 @@ class Battle(
         // Poison Touch: contact may poison the target
         if (contact && hitTarget && !subHit && !t.fainted && ability(m) == Ab.POISON_TOUCH && rng.chance(30))
             trySetStatus(t, Status.POISON, m, silentFail = true)
+        // Rocky Helmet: contact attacker loses 1/6 (unless Magic Guard)
+        if (contact && hitTarget && !subHit && !m.fainted && item(t) == It.ROCKY_HELMET && ability(m) != Ab.MAGIC_GUARD) {
+            msg("${nm(m)}은 울퉁불퉁멧으로 데미지를 입었다!")
+            damage(m, maxOf(1, m.maxHp / 6))
+            if (m.fainted) faint(m)
+        }
+        // Air Balloon pops when its holder is hit by a damaging move
+        if (hitTarget && !t.fainted && item(t) == It.AIR_BALLOON) {
+            consumeItem(t); msg("${nm(t)}의 풍선이 터졌다!")
+        }
+        // Jaboca Berry: physical hit makes the attacker lose 1/8
+        if (hitTarget && !subHit && !m.fainted && move.isPhysical && item(t) == It.JABOCA_BERRY && ability(m) != Ab.MAGIC_GUARD) {
+            consumeItem(t); msg("${nm(m)}은 자뭉열매로 데미지를 입었다!")
+            damage(m, maxOf(1, m.maxHp / 8)); if (m.fainted) faint(m)
+        }
+        // Enigma Berry: heal 1/4 when hit super-effectively
+        if (hitTarget && !t.fainted && item(t) == It.ENIGMA_BERRY && dealt.isNotEmpty()) {
+            val wasSE = effectiveness(type, m, t) > 4
+            if (wasSE) { consumeItem(t); if (t.hp < t.maxHp) { heal(t, t.maxHp / 4); msg("${nm(t)}은 비자열매로 체력을 회복했다!") } }
+        }
         // secondary effects (not through a substitute)
         if (hitTarget && !subHit) secondary(m, t, move, type, total)
         // self-affecting effects that happen even through a substitute
@@ -1866,7 +1887,7 @@ class Battle(
         val it = item(m)
         if (it == It.SITRUS_BERRY && m.hp * 2 <= m.maxHp) eatBerry(m, it, forced = false)
         val pinch = if (ability(m) == Ab.GLUTTONY) 2 else 4
-        if (it in setOf(It.LIECHI_BERRY, It.SALAC_BERRY, It.PETAYA_BERRY) && m.hp * pinch <= m.maxHp) eatBerry(m, it, forced = false)
+        if (it in setOf(It.LIECHI_BERRY, It.SALAC_BERRY, It.PETAYA_BERRY, It.GANLON_BERRY) && m.hp * pinch <= m.maxHp) eatBerry(m, it, forced = false)
     }
 
     private suspend fun statusBerry(m: BattleMon) {
@@ -1906,12 +1927,15 @@ class Battle(
                     msg("${Josa.eunNeun(nm(m))} ${Josa.ro(name)} 상태가 회복되었다!")
                 }
             }
-            It.LIECHI_BERRY, It.SALAC_BERRY, It.PETAYA_BERRY -> {
+            It.LIECHI_BERRY, It.SALAC_BERRY, It.PETAYA_BERRY, It.GANLON_BERRY -> {
                 val pinch = if (ability(m) == Ab.GLUTTONY) 2 else 4
                 if (forced || m.hp * pinch <= m.maxHp) {
                     use()
                     msg("${Josa.eunNeun(nm(m))} ${Josa.eulReul(name)} 먹었다!")
-                    changeStage(m, when (berry) { It.LIECHI_BERRY -> Stat.ATK; It.SALAC_BERRY -> Stat.SPE; else -> Stat.SPA }, 1, m)
+                    changeStage(m, when (berry) {
+                        It.LIECHI_BERRY -> Stat.ATK; It.SALAC_BERRY -> Stat.SPE
+                        It.GANLON_BERRY -> Stat.DEF; else -> Stat.SPA
+                    }, 1, m)
                 }
             }
             else -> if (forced) use()
@@ -2091,6 +2115,7 @@ class Battle(
             }
             // Toxic Orb
             if (it == It.TOXIC_ORB && m.status == Status.NONE) trySetStatus(m, Status.TOXIC, null, silentFail = true)
+            if (it == It.FLAME_ORB && m.status == Status.NONE) trySetStatus(m, Status.BURN, null, silentFail = true)
             // Speed Boost / Slow Start
             if (a == Ab.SPEED_BOOST && m.turnsOnField > 0 && m.stages[Stat.SPE] < 6) { msg("${nm(m)}의 가속!"); changeStage(m, Stat.SPE, 1, m) }
             if (a == Ab.SLOW_START) { m.slowStartTurns++; if (m.slowStartTurns == 5) msg("${Josa.eunNeun(nm(m))} 드디어 컨디션을 되찾았다!") }

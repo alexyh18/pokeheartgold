@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.4.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.5.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,12 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.5 변경점
+
+- 배경을 배틀서브웨이 스테이지(화살표 플랫폼)로 통일 — 보스전도 밤하늘 대신 서브웨이 스테이지 사용
+- 배틀 화면을 더 자연스럽게: 포켓몬 등장 슬라이드·발밑 그림자, BW2풍 프레임 메시지창, 상태창에 상태이상 배지 위치 정리
+- 도구 효과 점검 및 누락분 보강: 불꽃구슬(자기 화상), 풍선(땅 면역·피격 시 터짐), 울퉁불퉁멧(접촉 반동), 자뭉/비자/수진열매 추가 — 왕의징표석/예리한손톱(풀죽음), 구애 계열, 기합의띠, 생명의구슬, 약점보험(저항)열매 등은 기존 동작 확인
 
 ## v2.4 변경점
 

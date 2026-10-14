@@ -174,6 +174,7 @@ object It {
     const val POWER_HERB = 271
     const val TOXIC_ORB = 272
     const val FLAME_ORB = 273
+    const val ENIGMA_BERRY = 208
     const val FOCUS_SASH = 275
     const val ZOOM_LENS = 276
     const val METRONOME = 277

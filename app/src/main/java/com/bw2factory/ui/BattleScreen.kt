@@ -91,22 +91,28 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
     val bg = vm.sprites.battleBackground(s.background)
     Canvas(Modifier.fillMaxSize().clipToBounds()) {
         val u = size.width / SCENE_W
-        // BW2 battle background (250x198 rip, stretched to the 256x192 top screen)
+        // Battle Subway stage background (250x198 rip, stretched to the 256x192 top screen)
         if (bg != null) drawPixel(bg, Offset.Zero, size)
         else drawRect(Brush.verticalGradient(listOf(Color(0xFF68B0E8), Color(0xFF4E8C3C))), size = size)
-        // foe (front sprite, 96x96) standing on the far platform, centred near (186, 98)
+        // foe (front sprite, 96x96) stands on the far platform near (186, 98); slides in from the right
         if (foeBmp != null && (foe.visible || ff < 1f) && !foe.hidden) {
             val sz = 96 * u
-            val x = (186 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u
+            val slide = (1f - (if (foe.visible) fe else 1f)) * 60 * u
+            val x = (186 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u + slide
             val y = (110 - 96) * u + ff * 40 * u
-            sprite(foeBmp, x, y, sz, alpha = (if (foe.visible) fe else 1f) * (1f - ff), flash = foe.flashUp)
+            val a = (if (foe.visible) fe else 1f) * (1f - ff)
+            spriteShadow(x, y, sz, 0.86f, a)
+            sprite(foeBmp, x, y, sz, alpha = a, flash = foe.flashUp)
         }
-        // player (back sprite, scaled up like BW's closer camera) on the near platform
+        // player (back sprite, scaled up like BW's closer camera) on the near platform; slides in from the left
         if (myBmp != null && (me.visible || mf < 1f) && !me.hidden) {
             val sz = 132 * u
-            val x = (78 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u
+            val slide = (1f - (if (me.visible) me1 else 1f)) * 70 * u
+            val x = (78 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u - slide
             val y = (196 - 132) * u + mf * 50 * u
-            sprite(myBmp, x, y, sz, alpha = (if (me.visible) me1 else 1f) * (1f - mf), flash = me.flashUp)
+            val a = (if (me.visible) me1 else 1f) * (1f - mf)
+            spriteShadow(x, y, sz, 0.9f, a)
+            sprite(myBmp, x, y, sz, alpha = a, flash = me.flashUp)
         }
         // weather tint
         val tint = when (weather) {
@@ -118,6 +124,19 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
         }
         if (tint != null) drawRect(tint, size = size)
     }
+}
+
+/** Soft elliptical drop shadow under a sprite, anchored to the platform. */
+private fun DrawScope.spriteShadow(x: Float, y: Float, sz: Float, foot: Float, alpha: Float) {
+    if (alpha <= 0f) return
+    val w = sz * 0.62f
+    val h = sz * 0.14f
+    drawOval(
+        Color(0x33000000),
+        topLeft = Offset(x + sz / 2 - w / 2, y + sz * foot - h / 2),
+        size = Size(w, h),
+        alpha = alpha,
+    )
 }
 
 private fun DrawScope.sprite(bmp: ImageBitmap, x: Float, y: Float, sz: Float, alpha: Float, flash: Boolean?) {
@@ -152,18 +171,15 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
             .padding(start = if (side == 1) 16.dp else 10.dp, end = if (side == 1) 10.dp else 16.dp, top = 3.dp, bottom = 4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(m.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+            Text(m.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             genderMark(m)?.let { (t, c) -> Text(t, color = c, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.width(3.dp))
+            if (m.status.ordinal != 0) { Spacer(Modifier.width(4.dp)); StatusBadge(m.status) }
+            Spacer(Modifier.weight(1f))
             Text("Lv", color = Bw.gold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             Text("${m.level}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(1.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusBadge(m.status)
-            if (m.status.ordinal != 0) Spacer(Modifier.width(3.dp))
-            Bw2HpBar(v.hpAnim.value, Modifier.weight(1f))
-        }
+        Bw2HpBar(v.hpAnim.value, Modifier.fillMaxWidth())
         if (side == 0) {
             Text("${v.displayHp} / ${v.maxHp}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
         } else {
@@ -209,11 +225,17 @@ private fun genderMark(m: BattleMon) = when (m.gender) {
 
 @Composable
 private fun MessageBox(text: String) {
-    Box(
-        Modifier.fillMaxWidth().height(64.dp).background(Color(0xFF202020))
-            .border(3.dp, Color(0xFF58A0B8)).padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
-        Text(text, color = Color.White, fontSize = 15.sp, lineHeight = 20.sp)
+    // BW2-style framed message window: rounded dark-blue panel with a light inner border.
+    Box(Modifier.fillMaxWidth().height(66.dp).padding(4.dp)) {
+        Box(
+            Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF283848), Color(0xFF1A2430))))
+                .border(2.dp, Color(0xFF88B0C8), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(text, color = Color.White, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }
 
