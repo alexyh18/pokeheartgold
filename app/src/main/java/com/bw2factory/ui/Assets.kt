@@ -20,4 +20,5 @@ class Sprites(private val open: (String) -> java.io.InputStream) {
     /** 32x64 icon sheet (two animation frames stacked) */
     fun icon(species: Int) = load("sprites/icon/$species.png")
     fun trainer(cell: Int) = load("sprites/trainer/$cell.png")
+    fun battleBackground(name: String) = load("sprites/battle_bg/$name.png")
 }

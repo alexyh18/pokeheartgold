@@ -1,8 +1,7 @@
 package com.bw2factory.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,6 +13,29 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+/**
+ * A float animated with plain delays. The battle runs in viewModelScope, which has no MonotonicFrameClock,
+ * so Compose's Animatable.animateTo would throw there (that was the crash on battle start).
+ */
+class Anim(initial: Float) {
+    var value by mutableFloatStateOf(initial)
+        private set
+
+    fun snapTo(v: Float) { value = v }
+
+    suspend fun animateTo(target: Float, durationMs: Int) {
+        val start = value
+        val steps = maxOf(1, durationMs / FRAME_MS)
+        for (i in 1..steps) {
+            delay(FRAME_MS.toLong())
+            value = start + (target - start) * i / steps
+        }
+        value = target
+    }
+
+    private companion object { const val FRAME_MS = 16 }
+}
+
 enum class InputMode { NONE, COMMAND, FIGHT, PARTY, REPLACE }
 
 /** What the battle screen draws for one side; updated only by battle events so HP/sprites animate in order. */
@@ -24,11 +46,11 @@ class SideView {
     var displayHp by mutableIntStateOf(0)
     var maxHp by mutableIntStateOf(1)
     var statusTick by mutableIntStateOf(0)
-    val hpAnim = Animatable(0f)
-    val enter = Animatable(0f)
-    val faint = Animatable(0f)
-    val shake = Animatable(0f)
-    val lunge = Animatable(0f)
+    val hpAnim = Anim(0f)
+    val enter = Anim(0f)
+    val faint = Anim(0f)
+    val shake = Anim(0f)
+    val lunge = Anim(0f)
     var flashUp by mutableStateOf<Boolean?>(null)
 }
 
@@ -42,6 +64,8 @@ class BattleSession(
     foeParty: List<FactoryMon>,
     val trainerLabel: String,
     seed: Long,
+    /** file name under assets/sprites/battle_bg */
+    val background: String = "facility_0",
 ) {
     private val rng = BattleRandom(seed)
     private val ai = FactoryAi(rng)
@@ -121,11 +145,11 @@ class BattleSession(
                 v.faint.snapTo(0f); v.enter.snapTo(0f)
                 v.visible = true
                 v.statusTick++
-                v.enter.animateTo(1f, tween(350))
+                v.enter.animateTo(1f, 350)
             }
             is BattleEvent.Withdraw -> {
                 val v = views[e.side]
-                v.enter.animateTo(0f, tween(250))
+                v.enter.animateTo(0f, 250)
                 v.visible = false
             }
             is BattleEvent.Hp -> {
@@ -133,7 +157,7 @@ class BattleSession(
                 val target = e.to.toFloat() / e.max
                 val steps = 20
                 coroutineScope {
-                    launch { v.hpAnim.animateTo(target, tween(if (fast) 250 else 550)) }
+                    launch { v.hpAnim.animateTo(target, if (fast) 250 else 550) }
                     launch {
                         for (i in 1..steps) {
                             v.displayHp = e.from + (e.to - e.from) * i / steps
@@ -146,18 +170,18 @@ class BattleSession(
             is BattleEvent.StatusChanged -> views[e.side].statusTick++
             is BattleEvent.Faint -> {
                 val v = views[e.side]
-                v.faint.animateTo(1f, tween(450))
+                v.faint.animateTo(1f, 450)
                 v.visible = false
             }
             is BattleEvent.UseMove -> {
                 val v = views[e.side]
                 v.lunge.snapTo(0f)
-                v.lunge.animateTo(1f, tween(120)); v.lunge.animateTo(0f, tween(120))
+                v.lunge.animateTo(1f, 120); v.lunge.animateTo(0f, 120)
             }
             is BattleEvent.Hit -> {
                 val v = views[e.side]
                 repeat(if (e.effectiveness > 4) 4 else 3) {
-                    v.shake.animateTo(1f, tween(45)); v.shake.animateTo(0f, tween(45))
+                    v.shake.animateTo(1f, 45); v.shake.animateTo(0f, 45)
                 }
             }
             is BattleEvent.StatAnim -> {

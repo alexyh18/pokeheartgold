@@ -12,6 +12,7 @@ import com.bw2factory.engine.Josa
 import com.bw2factory.factory.Factory
 import com.bw2factory.factory.FactoryRules
 import com.bw2factory.factory.FactoryState
+import com.bw2factory.factory.OpponentHint
 import com.bw2factory.factory.Phase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -42,8 +43,8 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
         private set
 
     private fun load(): FactoryState {
-        val saved = store.read()?.let { Factory.decode(it) }
-        return saved ?: factory.newChallenge(null).also { save(it) }
+        val saved = store.read()?.let { Factory.decode(it) }?.let { factory.normalize(it) }
+        return (saved ?: factory.newChallenge(null)).also { save(it) }
     }
 
     private fun save(s: FactoryState) {
@@ -59,6 +60,15 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
     fun trainerLabel(id: Int = state.trainerId) = trainer(id).let { "${it.classKo} ${it.name}" }
     val isFactoryHead get() = state.trainerId == FactoryRules.THORTON_SILVER || state.trainerId == FactoryRules.THORTON_GOLD
 
+    /** Hint about the next opponent (null when no battle is coming, e.g. after a loss). */
+    val hint: OpponentHint?
+        get() = state.takeIf { it.phase in setOf(Phase.RENTAL, Phase.PRE_BATTLE, Phase.SWAP) }
+            ?.let { OpponentHint.of(data, it.round, it.opponent) }
+
+    /** BW2 battle background: the facility stage (changing each round) or the Factory Head's stage. */
+    private fun backgroundFor(s: FactoryState) =
+        if (isFactoryHead) "head" else "facility_${s.round % 5}"
+
     fun chooseRentals(picks: List<Int>) = update(factory.chooseRentals(state, picks))
     fun reorder(order: List<Int>) = update(factory.reorder(state, order))
     fun swap(mine: Int?, theirs: Int?) = update(factory.swap(state, mine, theirs))
@@ -69,7 +79,7 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
         if (session != null) return
         val s = state
         val label = trainerLabel()
-        val bs = BattleSession(data, s.party, s.opponent, label, System.nanoTime())
+        val bs = BattleSession(data, s.party, s.opponent, label, System.nanoTime(), backgroundFor(s))
         session = bs
         battleResult = null
         viewModelScope.launch {

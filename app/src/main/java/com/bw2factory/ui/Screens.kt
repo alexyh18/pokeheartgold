@@ -21,7 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bw2factory.engine.MonInfo
+import com.bw2factory.engine.Josa
 import com.bw2factory.factory.FactoryRules
+import com.bw2factory.factory.OpponentHint
 import com.bw2factory.factory.Phase
 
 @Composable
@@ -77,6 +79,7 @@ private fun RentalScreen(vm: GameViewModel) {
     val s = vm.state
     val picks = remember(s.rentals) { mutableStateListOf<Int>() }
     Column(Modifier.fillMaxSize().padding(8.dp)) {
+        HintPanel(vm)
         Text(
             "렌탈 포켓몬 6마리 중 3마리를 고르세요. 처음 고른 포켓몬이 선두로 나갑니다.",
             color = Bw.text, fontSize = 13.sp, modifier = Modifier.padding(4.dp),
@@ -169,6 +172,8 @@ private fun PreBattleScreen(vm: GameViewModel) {
                 }
             }
         }
+        Spacer(Modifier.height(8.dp))
+        HintPanel(vm, showTrainer = false)
         Spacer(Modifier.height(12.dp))
         PartyOrder(vm)
         Spacer(Modifier.height(16.dp))
@@ -179,21 +184,22 @@ private fun PreBattleScreen(vm: GameViewModel) {
 @Composable
 private fun SwapScreen(vm: GameViewModel) {
     val s = vm.state
-    var mine by remember(s.party, s.opponent) { mutableStateOf<Int?>(null) }
-    var theirs by remember(s.party, s.opponent) { mutableStateOf<Int?>(null) }
+    var mine by remember(s.party, s.swapOffer) { mutableStateOf<Int?>(null) }
+    var theirs by remember(s.party, s.swapOffer) { mutableStateOf<Int?>(null) }
     Column(Modifier.fillMaxSize().padding(8.dp)) {
         Text(
             "승리했다! 방금 싸운 상대의 포켓몬 1마리와 교환할 수 있습니다.\n내보낼 포켓몬과 받을 포켓몬을 하나씩 고르세요.",
             color = Bw.text, fontSize = 13.sp, modifier = Modifier.padding(4.dp),
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            HintPanel(vm)
             Text("내 파티 (내보낼 포켓몬)", color = Bw.gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             s.party.forEachIndexed { i, mon ->
                 val info = remember(mon) { MonInfo(vm.data, mon) }
                 MonCard(vm, info, if (mine == i) 0 else null, Modifier.fillMaxWidth()) { mine = if (mine == i) null else i }
             }
             Text("상대 파티 (받을 포켓몬)", color = Bw.gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            s.opponent.forEachIndexed { i, mon ->
+            s.swapOffer.forEachIndexed { i, mon ->
                 val info = remember(mon) { MonInfo(vm.data, mon) }
                 MonCard(vm, info, if (theirs == i) 0 else null, Modifier.fillMaxWidth()) { theirs = if (theirs == i) null else i }
             }
@@ -240,4 +246,71 @@ private fun CenterMessage(title: String, body: String, button: String, onClick: 
         Spacer(Modifier.height(20.dp))
         BwButton(button, Modifier.fillMaxWidth(), onClick = onClick)
     }
+}
+
+/** The next opponent and what is known about their team (more is hidden in later rounds). */
+@Composable
+fun HintPanel(vm: GameViewModel, showTrainer: Boolean = true) {
+    val s = vm.state
+    val hint = vm.hint ?: return
+    val t = vm.trainer()
+    BwPanel(Modifier.fillMaxWidth(), selected = vm.isFactoryHead) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (showTrainer) {
+                PixelImage(vm.sprites.trainer(t.sprite), Modifier.size(width = 43.dp, height = 64.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (showTrainer) "다음 상대 · ${s.battleNumber}번째 · ${t.classKo} ${t.name}" else "상대 정보",
+                    color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                when (hint) {
+                    is OpponentHint.Species -> {
+                        Text(
+                            if (hint.species.size == 3) "상대가 데리고 있는 포켓몬" else "상대 포켓몬 중 2마리",
+                            color = Bw.textDim, fontSize = 11.sp,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            hint.species.forEach { sp ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    PixelImage(vm.sprites.front(sp), Modifier.size(52.dp))
+                                    Text(vm.data.species.getValue(sp).nameKo, color = Bw.text, fontSize = 11.sp)
+                                }
+                            }
+                            if (hint.species.size < 3) Text("+ ?", color = Bw.textDim, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    is OpponentHint.LeadAndMove -> {
+                        Text("선두 포켓몬과 그 기술 하나", color = Bw.textDim, fontSize = 11.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PixelImage(vm.sprites.front(hint.species), Modifier.size(52.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Column {
+                                Text(vm.data.species.getValue(hint.species).nameKo, color = Bw.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(hint.move.type))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    ) { Text(hint.move.nameKo, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(Josa.eulReul(hint.move.nameKo).removePrefix(hint.move.nameKo) + " 쓴다", color = Bw.textDim, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    is OpponentHint.MainType -> {
+                        Text("상대가 주로 사용하는 타입", color = Bw.textDim, fontSize = 11.sp)
+                        Spacer(Modifier.height(2.dp))
+                        Box(
+                            Modifier.clip(RoundedCornerShape(6.dp)).background(Bw.typeColor(hint.type))
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) { Text(vm.data.typeName(hint.type), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(6.dp))
 }

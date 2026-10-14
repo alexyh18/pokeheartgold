@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -37,7 +38,7 @@ import com.bw2factory.engine.Weather
 import kotlin.math.sin
 
 private const val SCENE_W = 256f
-private const val SCENE_H = 160f
+private const val SCENE_H = 192f
 
 @Composable
 fun BattleScreen(vm: GameViewModel, s: BattleSession) {
@@ -51,8 +52,8 @@ fun BattleScreen(vm: GameViewModel, s: BattleSession) {
             Scene(vm, s)
             val density = LocalDensity.current
             val dp = { v: Float -> with(density) { (v * u).toDp() } }
-            HpBox(vm.data, s, 1, Modifier.offset(x = dp(4f), y = dp(6f)).width(dp(120f)))
-            HpBox(vm.data, s, 0, Modifier.offset(x = dp(132f), y = dp(112f)).width(dp(120f)))
+            HpBox(vm.data, s, 1, Modifier.offset(x = dp(4f), y = dp(8f)).width(dp(120f)))
+            HpBox(vm.data, s, 0, Modifier.offset(x = dp(132f), y = dp(140f)).width(dp(120f)))
         }
         MessageBox(s.message)
         Box(
@@ -83,30 +84,24 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
     val fe = foe.enter.value; val ff = foe.faint.value; val fs = foe.shake.value; val fl = foe.lunge.value
     val me1 = me.enter.value; val mf = me.faint.value; val ms = me.shake.value; val ml = me.lunge.value
     val weather = s.weather
-    Canvas(Modifier.fillMaxSize()) {
+    val bg = vm.sprites.battleBackground(s.background)
+    Canvas(Modifier.fillMaxSize().clipToBounds()) {
         val u = size.width / SCENE_W
-        // sky and field
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF68B0E8), Color(0xFFC8E8F8)), endY = 70 * u), size = Size(size.width, 70 * u))
-        drawRect(Color(0xFF90B868), Offset(0f, 62 * u), Size(size.width, 10 * u))
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF80B858), Color(0xFF4E8C3C)), startY = 70 * u, endY = size.height),
-            Offset(0f, 70 * u), Size(size.width, size.height - 70 * u))
-        // platforms
-        drawOval(Color(0xFF5C8E40), Offset((188 - 58) * u, (90 - 13) * u), Size(116 * u, 26 * u))
-        drawOval(Color(0xFF9CCB70), Offset((188 - 52) * u, (90 - 11) * u), Size(104 * u, 20 * u))
-        drawOval(Color(0xFF4A7E34), Offset((70 - 78) * u, (152 - 16) * u), Size(156 * u, 32 * u))
-        drawOval(Color(0xFF8CC060), Offset((70 - 70) * u, (152 - 13) * u), Size(140 * u, 25 * u))
-        // foe (front sprite, 96x96)
+        // BW2 battle background (250x198 rip, stretched to the 256x192 top screen)
+        if (bg != null) drawPixel(bg, Offset.Zero, size)
+        else drawRect(Brush.verticalGradient(listOf(Color(0xFF68B0E8), Color(0xFF4E8C3C))), size = size)
+        // foe (front sprite, 96x96) standing on the far platform, centred near (186, 98)
         if (foeBmp != null && (foe.visible || ff < 1f) && !foe.hidden) {
             val sz = 96 * u
-            val x = (188 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u
-            val y = (95 - 96) * u + ff * 40 * u
+            val x = (186 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u
+            val y = (110 - 96) * u + ff * 40 * u
             sprite(foeBmp, x, y, sz, alpha = (if (foe.visible) fe else 1f) * (1f - ff), flash = foe.flashUp)
         }
-        // player (back sprite, scaled up like BW's closer camera)
+        // player (back sprite, scaled up like BW's closer camera) on the near platform
         if (myBmp != null && (me.visible || mf < 1f) && !me.hidden) {
             val sz = 132 * u
-            val x = (70 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u
-            val y = (160 - 132) * u + mf * 50 * u
+            val x = (78 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u
+            val y = (196 - 132) * u + mf * 50 * u
             sprite(myBmp, x, y, sz, alpha = (if (me.visible) me1 else 1f) * (1f - mf), flash = me.flashUp)
         }
         // weather tint
