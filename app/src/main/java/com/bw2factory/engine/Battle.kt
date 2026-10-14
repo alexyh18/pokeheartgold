@@ -22,6 +22,8 @@ sealed interface BattleEvent {
     data class StatAnim(val side: Int, val up: Boolean) : BattleEvent
     data class Hidden(val side: Int, val hidden: Boolean) : BattleEvent
     data class WeatherChanged(val weather: Weather) : BattleEvent
+    /** A substitute doll appeared (up = true) or broke (up = false) on [side]. */
+    data class Substitute(val side: Int, val up: Boolean) : BattleEvent
 }
 
 interface BattleController {
@@ -1146,7 +1148,11 @@ class Battle(
             if (crit) msg("급소에 맞았다!")
             if (showEff) effMessage(eff, t)
             msg("대신 ${nm(t)}의 분신이 공격을 받았다!")
-            if (t.substituteHp <= 0) { t.substituteHp = 0; msg("${nm(t)}의 분신은 사라져 버렸다…") }
+            if (t.substituteHp <= 0) {
+                t.substituteHp = 0
+                emit(BattleEvent.Substitute(t.side, false))
+                msg("${nm(t)}의 분신은 사라져 버렸다…")
+            }
             return 0
         }
         var d = minOf(dmg, t.hp)
@@ -1690,7 +1696,11 @@ class Battle(
                 when {
                     m.substituteHp > 0 -> msg("${Josa.eunNeun(nm(m))} 이미 분신이 나와 있다!")
                     m.hp <= cost -> msg("하지만 분신을 만들기에는 체력이 모자랐다!")
-                    else -> { damage(m, cost); m.substituteHp = cost; msg("${nm(m)}의 분신이 나타났다!") }
+                    else -> {
+                        damage(m, cost); m.substituteHp = cost
+                        emit(BattleEvent.Substitute(m.side, true))
+                        msg("${nm(m)}의 분신이 나타났다!")
+                    }
                 }
             }
             "SET_REFLECT", "SET_LIGHT_SCREEN" -> {

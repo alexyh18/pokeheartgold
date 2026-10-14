@@ -59,6 +59,10 @@ class SideView {
     var flashUp by mutableStateOf<Boolean?>(null)
     /** continuous idle bob phase (0..1 looping), advanced by the UI's frame loop */
     var idle by mutableFloatStateOf(0f)
+    /** a substitute doll is standing in for this Pokémon */
+    var substitute by mutableStateOf(false)
+    /** 0..1 swap/pop animation progress for the substitute doll */
+    val subAnim = Anim(0f)
 }
 
 /**
@@ -160,14 +164,16 @@ class BattleSession(
                 v.hpAnim.snapTo(e.mon.hp.toFloat() / e.mon.maxHp)
                 v.hidden = false
                 v.faint.snapTo(0f); v.enter.snapTo(0f)
+                v.substitute = false; v.subAnim.snapTo(0f)
                 v.visible = true
                 v.statusTick++
-                v.enter.animateTo(1f, 350)
+                v.enter.animateTo(1f, (350 * animScale).toInt().coerceAtLeast(1))
             }
             is BattleEvent.Withdraw -> {
                 val v = views[e.side]
-                v.enter.animateTo(0f, 250)
+                v.enter.animateTo(0f, (250 * animScale).toInt().coerceAtLeast(1))
                 v.visible = false
+                v.substitute = false; v.subAnim.snapTo(0f)
             }
             is BattleEvent.Hp -> {
                 val v = views[e.side]
@@ -219,6 +225,22 @@ class BattleSession(
             }
             is BattleEvent.Hidden -> views[e.side].hidden = e.hidden
             is BattleEvent.WeatherChanged -> weather = e.weather
+            is BattleEvent.Substitute -> {
+                val v = views[e.side]
+                if (e.up) {
+                    // Pokémon ducks out, the doll pops in.
+                    v.lunge.snapTo(0f)
+                    v.lunge.animateTo(1f, (120 * animScale).toInt().coerceAtLeast(1))
+                    v.substitute = true
+                    v.subAnim.snapTo(0f)
+                    v.subAnim.animateTo(1f, (260 * animScale).toInt().coerceAtLeast(1))
+                    v.lunge.animateTo(0f, (120 * animScale).toInt().coerceAtLeast(1))
+                } else {
+                    // doll shatters, Pokémon returns.
+                    v.subAnim.animateTo(0f, (220 * animScale).toInt().coerceAtLeast(1))
+                    v.substitute = false
+                }
+            }
         }
     }
 }

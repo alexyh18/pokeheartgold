@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -115,8 +116,11 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
             val x = (186 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u + slide
             val y = (110 - 96) * u + ff * 40 * u + (if (ff == 0f) foeBob else 0f)
             val a = (if (foe.visible) fe else 1f) * (1f - ff)
+            val subP = foe.subAnim.value
             spriteShadow(x, (110 - 96) * u + ff * 40 * u, sz, 0.86f, a)
-            sprite(foeBmp, x, y, sz, alpha = a, flash = foe.flashUp)
+            // Show the doll while the substitute is up, the Pokémon otherwise. Cross-fade on the swap.
+            if (subP < 1f) sprite(foeBmp, x, y, sz, alpha = a * (1f - subP), flash = foe.flashUp)
+            if (subP > 0f) drawSubDoll(x + sz / 2, (110) * u, sz * 0.5f * subP, a)
         }
         // player (back sprite, scaled up like BW's closer camera) on the near platform; slides in from the left
         if (myBmp != null && (me.visible || mf < 1f) && !me.hidden) {
@@ -125,8 +129,10 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
             val x = (78 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u - slide
             val y = (196 - 132) * u + mf * 50 * u + (if (mf == 0f) myBob else 0f)
             val a = (if (me.visible) me1 else 1f) * (1f - mf)
+            val subP = me.subAnim.value
             spriteShadow(x, (196 - 132) * u + mf * 50 * u, sz, 0.9f, a)
-            sprite(myBmp, x, y, sz, alpha = a, flash = me.flashUp)
+            if (subP < 1f) sprite(myBmp, x, y, sz, alpha = a * (1f - subP), flash = me.flashUp)
+            if (subP > 0f) drawSubDoll(x + sz / 2, (188) * u, sz * 0.42f * subP, a)
         }
         // move effect overlay (procedural): travels from the user toward the target
         s.effect?.let { eff ->
@@ -193,6 +199,49 @@ private fun DrawScope.drawMoveEffect(type: Int, category: String, p: Float, src:
 
 private fun cosf(a: Float) = kotlin.math.cos(a)
 private fun sinf(a: Float) = kotlin.math.sin(a)
+
+/**
+ * An original stand-in doll drawn for the Substitute move (not any game's substitute art):
+ * a simple round-headed burlap puppet on a stick. [cx] is the horizontal centre, [footY] the ground line,
+ * [h] the doll height, scaled by [alpha].
+ */
+private fun DrawScope.drawSubDoll(cx: Float, footY: Float, h: Float, alpha: Float) {
+    if (h <= 0f || alpha <= 0f) return
+    val tan = Color(0xFFD9B271)
+    val tanDark = Color(0xFFB98F4E)
+    val headR = h * 0.26f
+    val bodyW = h * 0.42f
+    val bodyTop = footY - h * 0.62f
+    val bodyH = h * 0.5f
+    // stick base
+    drawLine(Color(0xFF8A6A3A).copy(alpha = alpha), Offset(cx, footY), Offset(cx, bodyTop + bodyH * 0.4f), h * 0.07f)
+    // body (rounded sack)
+    drawRoundRect(
+        tan.copy(alpha = alpha),
+        topLeft = Offset(cx - bodyW / 2, bodyTop),
+        size = Size(bodyW, bodyH),
+        cornerRadius = CornerRadius(bodyW * 0.4f, bodyW * 0.4f),
+    )
+    drawRoundRect(
+        tanDark.copy(alpha = alpha),
+        topLeft = Offset(cx - bodyW / 2, bodyTop + bodyH * 0.6f),
+        size = Size(bodyW, bodyH * 0.4f),
+        cornerRadius = CornerRadius(bodyW * 0.4f, bodyW * 0.4f),
+    )
+    // head
+    val headCy = bodyTop - headR * 0.7f
+    drawCircle(tan.copy(alpha = alpha), headR, Offset(cx, headCy))
+    // tie between head and body
+    drawRect(tanDark.copy(alpha = alpha), topLeft = Offset(cx - headR * 0.5f, headCy + headR * 0.7f), size = Size(headR, headR * 0.5f))
+    // simple stitched eyes + mouth
+    val eye = Color(0xFF2A2018).copy(alpha = alpha)
+    drawCircle(eye, headR * 0.14f, Offset(cx - headR * 0.4f, headCy))
+    drawCircle(eye, headR * 0.14f, Offset(cx + headR * 0.4f, headCy))
+    drawLine(eye, Offset(cx - headR * 0.3f, headCy + headR * 0.45f), Offset(cx + headR * 0.3f, headCy + headR * 0.45f), h * 0.03f)
+    // little stub arms
+    drawRoundRect(tan.copy(alpha = alpha), Offset(cx - bodyW * 0.78f, bodyTop + bodyH * 0.1f), Size(bodyW * 0.3f, bodyH * 0.28f), CornerRadius(bodyW * 0.15f))
+    drawRoundRect(tan.copy(alpha = alpha), Offset(cx + bodyW * 0.48f, bodyTop + bodyH * 0.1f), Size(bodyW * 0.3f, bodyH * 0.28f), CornerRadius(bodyW * 0.15f))
+}
 
 /** Soft elliptical drop shadow under a sprite, anchored to the platform. */
 private fun DrawScope.spriteShadow(x: Float, y: Float, sz: Float, foot: Float, alpha: Float) {
