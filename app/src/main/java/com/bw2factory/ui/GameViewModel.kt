@@ -17,17 +17,22 @@ import com.bw2factory.factory.Phase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Where the challenge is saved (SharedPreferences on device). */
+/** Where the challenge and settings are saved (SharedPreferences on device). */
 interface StateStore {
     fun read(): String?
     fun write(text: String)
+    /** Persisted battle-speed setting (0 slow, 1 normal, 2 fast); -1 if never set. */
+    fun readSpeed(): Int
+    fun writeSpeed(value: Int)
 }
 
 class PrefsStore(context: Context) : StateStore {
     private val prefs = context.getSharedPreferences("battle_factory", Context.MODE_PRIVATE)
     override fun read() = prefs.getString(KEY, null)
     override fun write(text: String) { prefs.edit().putString(KEY, text).apply() }
-    private companion object { const val KEY = "state_v1" }
+    override fun readSpeed() = prefs.getInt(SPEED_KEY, -1)
+    override fun writeSpeed(value: Int) { prefs.edit().putInt(SPEED_KEY, value).apply() }
+    private companion object { const val KEY = "state_v1"; const val SPEED_KEY = "battle_speed" }
 }
 
 class GameViewModel(val data: GameData, val sprites: Sprites, private val store: StateStore) : ViewModel() {
@@ -41,6 +46,16 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
     /** Post-battle banner, e.g. "승부에서 이겼다!" */
     var battleResult by mutableStateOf<String?>(null)
         private set
+
+    /** Battle-speed setting, persisted across battles (0 slow, 1 normal, 2 fast; default normal). */
+    var battleSpeed = store.readSpeed().let { if (it in 0..2) it else 1 }
+        private set
+
+    fun setBattleSpeed(value: Int) {
+        battleSpeed = value.coerceIn(0, 2)
+        store.writeSpeed(battleSpeed)
+        session?.speed = battleSpeed
+    }
 
     private fun load(): FactoryState {
         val saved = store.read()?.let { Factory.decode(it) }?.let { factory.normalize(it) }
@@ -87,6 +102,8 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
         val s = state
         val label = trainerLabel()
         val bs = BattleSession(data, s.party, s.opponent, label, System.nanoTime(), backgroundFor(s))
+        bs.speed = battleSpeed
+        bs.onSpeedChanged = { setBattleSpeed(it) }
         session = bs
         battleResult = null
         viewModelScope.launch {

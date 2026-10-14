@@ -99,7 +99,9 @@ class BattleSession(
 
     fun onTap() { tap?.complete(Unit) }
 
-    fun cycleSpeed() { speed = (speed + 1) % 3 }
+    /** Notified when the player changes the speed, so the setting can be persisted across battles. */
+    var onSpeedChanged: ((Int) -> Unit)? = null
+    fun cycleSpeed() { speed = (speed + 1) % 3; onSpeedChanged?.invoke(speed) }
     val speedLabel get() = when (speed) { 0 -> "느림"; 2 -> "빠름"; else -> "보통" }
 
     fun choose(a: Action) {
