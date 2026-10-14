@@ -118,12 +118,17 @@ object FactoryRules {
         return picks.map { buildMon(rng, it, iv) }
     }
 
-    /** The opponent trainer's team. */
+    /**
+     * The opponent trainer's team. In a PWT Rental Tournament every trainer draws from the shared
+     * rental pool (the Master pool here), so opponents are built from the whole eligible pool rather
+     * than a per-trainer set list — avoiding the player's own species/items.
+     */
     fun opponents(data: GameData, rng: LcRandom, trainerId: Int, trainerSets: List<Int>, playerParty: List<FactoryMon>): List<FactoryMon> {
         val iv = ivForTrainer(trainerId)
         val sp = playerParty.map { data.sets.getValue(it.setId).species }
         val items = playerParty.map { data.sets.getValue(it.setId).item }
-        val picks = pickSets(data, rng, trainerSets, TEAM_SIZE, sp, items)
+        val pool = trainerSets.ifEmpty { data.superSetIds }
+        val picks = pickSets(data, rng, pool, TEAM_SIZE, sp, items)
         return picks.map { buildMon(rng, it, iv) }
     }
 }

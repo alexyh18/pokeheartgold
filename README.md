@@ -7,23 +7,33 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 - 포켓몬을 고르기 전 다음 상대 정보 공개: 1라운드 3마리 전부, 2라운드 2마리, 3라운드 선두와 기술 1개, 4라운드부터 주 사용 타입
 - 승리 후 상대 포켓몬과 교환, 7열차(49전째) 마지막 칸에 배틀서브웨이 보스(Ingo) 등장
 - 연승·최고 기록·교환 횟수·파티는 매 단계 자동 저장
-- 1~5세대 포켓몬 296종, 기술 414개·특성 124개·도구 106개 구현
+- 포켓몬 풀은 **PWT 렌탈 토너먼트 마스터**에서 나오는 세트(700개, 175종). 플레이어·상대 모두 이 풀에서 추첨
+- 기술 354개·특성 110개·도구 97개 구현
 
 ## 설치
 
-`release/bw2-battle-subway-v2.16.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.17.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
 | 내용 | 출처 |
 |---|---|
-| 포켓몬 세트(1000개)·트레이너(315명) | `pokebw2` `data/facilities/battle_subway/` (JSON) |
+| 포켓몬 세트(PWT 렌탈 토너먼트, 마스터 풀 700개) | `pokebw2` `data/facilities/pwt_rental/` (JSON), 마스터 풀 범위는 `src/ov055/wbt_party.c` `sRentalFiles` |
+| 트레이너 직업·이름·구조 | `pokebw2` `data/facilities/battle_subway/trainers/` |
 | 열차/트레이너/세트 선택·IV 규칙, 보스 등장 | `pokebw2` `src/ov033/bsubway_scr.c`, `src/ov012/fld_btl_inst_tool.c` |
 | 배틀 메커니즘(데미지·급소·명중·스피드·상성표) | `pokebw2` `src/ov167/btl_server_flow.c`, `btl_calc.c` |
 | 종족치·기술·도구·특성 데이터, 포켓몬 스프라이트 | `pokebw2` `data/pokemon`, `data/moves`, `data/items`, `data/abilities` |
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.17 변경점
+
+- 포켓몬 풀을 **PWT 렌탈 토너먼트 마스터**에서 나오는 포켓몬으로 교체
+  - `pokebw2` `data/facilities/pwt_rental`의 1000개 세트 중 마스터 랭크 추첨 범위(arc 파일 209~908, `wbt_party.c`의 `sRentalFiles`)인 700개 세트(175종)만 사용
+  - 플레이어 렌탈과 상대 트레이너 모두 이 공용 풀에서 추첨(렌탈 토너먼트 규칙)
+  - 마스터 풀은 폴리곤2를 제외하면 전부 최종진화체 → 기존 "최종진화체(+폴리곤2)" 필터와 일치
+  - 사용하지 않는 스프라이트 정리
 
 ## v2.16 변경점
 

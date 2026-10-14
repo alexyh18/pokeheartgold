@@ -30,6 +30,12 @@ CACHE = os.path.join(ROOT, "tools", "cache")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets")
 
 SUBWAY = os.path.join(BW, "data", "facilities", "battle_subway")
+# The player's Pokémon pool comes from the PWT Rental Tournament. order.json has 1000 sets; the
+# Master-rank rental draws from arc file range 209..908 (sRentalFiles[*][1][*] in src/ov055/wbt_party.c:
+# group0 = 209..558, group1 = 559..908). Trainers/facility structure still come from the Battle Subway.
+PWT_RENTAL = os.path.join(BW, "data", "facilities", "pwt_rental")
+PWT_MASTER_FIRST = 209
+PWT_MASTER_LAST = 908
 KO = "3"
 
 # Moves not on any set but needed by the engine.
@@ -192,46 +198,46 @@ def main():
         if os.path.exists(p):
             TRAINER_CLASS_NAMES[key] = json.load(open(p, encoding="utf-8"))["name"]
 
-    order = json.load(open(os.path.join(SUBWAY, "order.json"), encoding="utf-8"))
-    # The battle code addresses sets and trainers by their arc file index, which is the order.json position.
-    set_index = {name: i for i, name in enumerate(order["pokemon"])}
+    # Trainer order/structure still comes from the Battle Subway.
+    subway_order = json.load(open(os.path.join(SUBWAY, "order.json"), encoding="utf-8"))
+    # Pokémon sets come from the PWT Rental Tournament arc instead.
+    pwt_order = json.load(open(os.path.join(PWT_RENTAL, "order.json"), encoding="utf-8"))
+    # The battle code addresses sets by arc file index, which is the order.json position.
+    set_index = {name: i for i, name in enumerate(pwt_order["pokemon"])}
 
-    # Sets that appear in the Super course: those used by any Super Single trainer (order.json indices
-    # 110-299, the sSuperTrainerRanges/last/top pools) plus the Super Single boss (index 307).
-    super_trainer_idx = set(range(110, 300)) | {307}
-    super_set_ids = set()
-    for ti in super_trainer_idx:
-        if ti >= len(order["trainers"]):
-            continue
-        tj = json.load(open(os.path.join(SUBWAY, "trainers", order["trainers"][ti] + ".json"), encoding="utf-8"))
-        super_set_ids.update(set_index[s] for s in tj["pokemon"])
+    # The PWT Rental Master pool: arc file indices 209..908 (see wbt_party.c sRentalFiles). These are the
+    # Pokémon the player and opponents draw from. The flag keeps the field name "super" so the engine's
+    # existing eligibility code (GameData.superSetIds / FactorySet.superCourse) works unchanged.
+    master_pool = set(range(PWT_MASTER_FIRST, PWT_MASTER_LAST + 1))
 
-    # ---- sets (Battle Subway: 1000 named sets, in order.json order)
+    # ---- sets (PWT Rental: 1000 named sets, in order.json order)
     sets, used_species, used_moves, used_items = {}, set(), set(), set()
     for name, i in set_index.items():
-        j = json.load(open(os.path.join(SUBWAY, "pokemon", name + ".json"), encoding="utf-8"))
+        j = json.load(open(os.path.join(PWT_RENTAL, "pokemon", name + ".json"), encoding="utf-8"))
         if j["species"] == "SPECIES_NONE":
             # Keep an index placeholder so later indices still line up, but mark it empty.
             sets[i] = {"id": i, "species": 0, "moves": [], "evs": [False] * 6, "nature": 0, "item": 0, "form": 0}
             continue
         sp = bw_species[j["species"]]
-        moves = []
-        for m in j["moves"]:
-            if m != "MOVE_NONE":
-                moves.append(bw_moves[m])
-                used_moves.add(m)
+        moves = [bw_moves[m] for m in j["moves"] if m != "MOVE_NONE"]
         ev = j["ev_flags"]
         item = bw_items[j["item"]]
-        if item:
-            used_items.add(j["item"])
+        in_master = i in master_pool
         sets[i] = {
             "id": i, "species": sp, "moves": moves,
-            # HP, Atk, Def, Spe, SpA, SpD (BSubwayPokemonData.evFlags bit order)
+            # HP, Atk, Def, Spe, SpA, SpD (set evFlags bit order)
             "evs": [ev["hp"], ev["attack"], ev["defense"], ev["speed"], ev["special_attack"], ev["special_defense"]],
             "nature": bw_nat[j["nature"]], "item": item, "form": j["form"],
-            "super": i in super_set_ids,  # used by a Super Single trainer
+            "super": in_master,  # in the PWT Rental Master pool (reuses the "super" flag/field)
         }
-        used_species.add(j["species"])
+        # Only the Master-pool sets actually appear in-game, so only their species/moves/items are needed.
+        if in_master:
+            used_species.add(j["species"])
+            for m in j["moves"]:
+                if m != "MOVE_NONE":
+                    used_moves.add(m)
+            if item:
+                used_items.add(j["item"])
 
     # ---- species (every species a subway set uses)
     # A species is "final" (fully evolved) when it has no further evolutions.
@@ -344,18 +350,18 @@ def main():
             continue
         types_out.append({"id": n, "key": const_to_dir(c, "TYPE_"), "nameKo": ko_ty.get(str(n + 1), c)})
 
-    # ---- trainers (Battle Subway, in order.json order)
+    # ---- trainers (Battle Subway, in order.json order; used only for class name/sprite/opponent names)
+    # In a PWT Rental Tournament everyone draws from the same shared rental pool, so trainers carry no
+    # per-trainer set list: opponents are built from the Master pool (GameData.superSetIds) in FactoryRules.
     trainers_out = []
-    for i, name in enumerate(order["trainers"]):
+    for i, name in enumerate(subway_order["trainers"]):
         j = json.load(open(os.path.join(SUBWAY, "trainers", name + ".json"), encoding="utf-8"))
         cls = j["class"]
         ko, sprite = CLASS_INFO.get(cls, ("트레이너", 0))
-        # The game draws one of the trainer's listed sets per slot; store their indices.
-        set_ids = [set_index[s] for s in j["pokemon"]]
         trainers_out.append({
             "id": i, "trainerClass": CLASS_ID.setdefault(cls, len(CLASS_ID)),
             "classKey": cls, "className": TRAINER_CLASS_NAMES.get(cls, cls), "classKo": ko,
-            "name": j.get("name", "?"), "sprite": sprite, "sets": set_ids,
+            "name": j.get("name", "?"), "sprite": sprite, "sets": [],
         })
 
     write("data/sets.json", list(sets.values()))

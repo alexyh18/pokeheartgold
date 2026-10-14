@@ -13,8 +13,8 @@ android {
         applicationId = "com.bw2factory"
         minSdk = 24
         targetSdk = 34
-        versionCode = 19
-        versionName = "2.16"
+        versionCode = 20
+        versionName = "2.17"
     }
 
     buildTypes {

@@ -74,7 +74,7 @@ private fun Header(vm: GameViewModel, onForfeit: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("배틀서브웨이 · 슈퍼싱글", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("배틀서브웨이 · 렌탈토너먼트(마스터)", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(
                 if (s.phase == Phase.LOST) s.phase.title
                 else "라운드 ${s.round + 1} · ${s.battleInRound + 1}번째 배틀 · ${s.phase.title}",
