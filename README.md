@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.15.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.16.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,17 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.16 변경점
+
+- 조건에 따라 위력이 바뀌는 기술 구현
+  - 헤비봄버·히트스탬프: 상대보다 무거울수록 위력 상승(40~120)
+  - 일렉트릭볼: 상대보다 빠를수록 위력 상승(40~150)
+  - 잠재파워: 위력 60 고정, 타입은 개체값에 따라 결정(배틀서브웨이는 6스탯 개체값이 동일 → 짝수면 격투, 홀수면 악)
+  - 자연의은혜: 지닌 나무열매에 따라 타입·위력 결정, 열매가 없으면 실패(사용 시 열매 소모)
+  - 목숨걸기: 자신의 현재 HP만큼 데미지를 주고 자신은 쓰러짐
+  - 매그니튜드: 랜덤 위력(10~150)
+- 상대 특성 때문에 위력/상성이 달라지는 것은 기술 선택 화면에 미리 표시하지 않음(예: 부유·저수·저전압·건조피부·축전·흡반 등). 타입 상성표에 따른 상성(고스트가 노말/격투 무효, 비행이 땅 무효 등)만 표시
 
 ## v2.15 변경점
 

@@ -177,18 +177,22 @@ class Battle(
      * Effectiveness label of [move] used by [user] against the current foe, for the move-select UI.
      * Returns one of -2 (x1/4 or less), -1 (x1/2), 0 (x1 / status / no info), 1 (x2), 2 (x4), or null if immune.
      */
+    /**
+     * Type-matchup tier shown in the fight menu. Deliberately uses ONLY the type chart (including
+     * fixed type-based immunities like Ghost vs Normal/Fighting and Flying vs Ground) and does NOT
+     * reveal anything that depends on the opponent's ability — e.g. Levitate/부유, Water Absorb/저수,
+     * Flash Fire, Lightning Rod, Sap Sipper, Dry Skin, Storm Drain, Motor Drive — because the player
+     * cannot normally know the foe's ability in advance.
+     */
     fun moveEffectivenessTier(user: BattleMon, move: MoveData): Int? {
         if (move.isStatus) return 0
         val t = foe(user)
         if (t.fainted) return 0
-        // Abilities that give full immunity to a whole type
-        val a = defAbility(user, t)
         val type = moveType(user, move)
-        val absorbImmune = (type == Types.ELECTRIC && a in setOf(Ab.VOLT_ABSORB, Ab.MOTOR_DRIVE, Ab.LIGHTNINGROD)) ||
-            (type == Types.WATER && a in setOf(Ab.WATER_ABSORB, Ab.DRY_SKIN, Ab.STORM_DRAIN)) ||
-            (type == Types.FIRE && a == Ab.FLASH_FIRE) || (type == Types.GRASS && a == Ab.SAP_SIPPER)
-        if (absorbImmune) return null
-        val q = effectiveness(type, user, t)
+        var q = 4
+        for (dt in t.effectiveTypes) q = q * Types.single(type, dt) / 4
+        // Note: no grounded()/Levitate check here — a Ground move's "no effect" against Levitate
+        // must stay hidden. Flying's native Ground immunity is already in the type chart above.
         return when {
             q == 0 -> null
             q <= 1 -> -2
@@ -200,17 +204,24 @@ class Battle(
     }
 
     fun moveType(user: BattleMon, move: MoveData): Int {
-        if (move.effect == "CHANGE_TYPE_WITH_WEATHER") {
-            return when (effWeather()) {
+        when (move.effect) {
+            "CHANGE_TYPE_WITH_WEATHER" -> return when (effWeather()) {
                 Weather.SUN -> Types.FIRE
                 Weather.RAIN -> Types.WATER
                 Weather.HAIL -> Types.ICE
                 Weather.SAND -> Types.ROCK
                 Weather.NONE -> Types.NORMAL
             }
+            // Hidden Power: type is derived from the user's IVs (see BattleMon.hiddenPowerType).
+            "RANDOM_POWER_BASED_ON_IVS" -> return user.hiddenPowerType
+            // Natural Gift: type comes from the held berry (Normal + fails if no berry).
+            "NATURAL_GIFT" -> return naturalGift(item(user))?.first ?: Types.NORMAL
         }
         return move.type
     }
+
+    /** Natural Gift: held-berry item id -> (type, base power). Null if the item is not a usable berry. */
+    private fun naturalGift(itemId: Int): Pair<Int, Int>? = It.NATURAL_GIFT[itemId]
 
     // ------------------------------------------------------------------ legal moves
     fun usableSlots(m: BattleMon): List<Int> = m.moves.indices.filter { i ->
@@ -889,7 +900,8 @@ class Battle(
     private fun baseDamage(level: Int, power: Int, atk: Int, def: Int): Int =
         ((2 * level / 5 + 2).toLong() * power * atk / maxOf(1, def) / 50 + 2).toInt()
 
-    private fun movePower(m: BattleMon, t: BattleMon, move: MoveData, type: Int, pursuitBoost: Boolean): Int {
+    /** Internal (visible to tests): effective base power of [move] in [m]'s attack on [t]. */
+    internal fun movePower(m: BattleMon, t: BattleMon, move: MoveData, type: Int, pursuitBoost: Boolean): Int {
         var p = move.power
         when (move.effect) {
             "INCREASE_POWER_WITH_LESS_HP" -> {
@@ -901,6 +913,25 @@ class Battle(
             "INCREASE_POWER_WITH_WEIGHT" -> p = t.species.weight.let { w ->
                 when { w < 100 -> 20; w < 250 -> 40; w < 500 -> 60; w < 1000 -> 80; w < 2000 -> 100; else -> 120 }
             }
+            // Heavy Slam / Heat Crash: power rises as the user outweighs the target.
+            "HEAVY_SLAM" -> {
+                val ratio = m.species.weight * 100 / maxOf(1, t.species.weight) // user% of target
+                p = when { ratio >= 500 -> 120; ratio >= 400 -> 100; ratio >= 300 -> 80; ratio >= 200 -> 60; else -> 40 }
+            }
+            // Electro Ball: power rises as the user outspeeds the target.
+            "ELECTRO_BALL" -> {
+                val ratio = speed(m) * 100 / maxOf(1, speed(t)) // user% of target speed
+                p = when { ratio >= 400 -> 150; ratio >= 300 -> 120; ratio >= 200 -> 80; ratio >= 100 -> 60; else -> 40 }
+            }
+            // Magnitude (carries the PSYWAVE effect in data): a random-tier Ground attack.
+            "PSYWAVE" -> {
+                val r = rng.next(100)
+                p = when { r < 5 -> 10; r < 15 -> 30; r < 35 -> 50; r < 65 -> 70; r < 85 -> 90; r < 95 -> 110; else -> 150 }
+            }
+            // Hidden Power: fixed 60 power in Gen 5 (type derives from IVs, see moveType).
+            "RANDOM_POWER_BASED_ON_IVS" -> p = 60
+            // Natural Gift: power from the held berry (type set in moveType). Fails with no berry.
+            "NATURAL_GIFT" -> p = naturalGift(item(m))?.second ?: 1
             "POWER_BASED_ON_LOW_SPEED" -> p = minOf(150, 25 * speed(t) / maxOf(1, speed(m)) + 1)
             "POWER_BASED_ON_FRIENDSHIP" -> p = maxOf(1, m.friendship * 10 / 25)
             "POWER_BASED_ON_LOW_FRIENDSHIP" -> p = maxOf(1, (255 - m.friendship) * 10 / 25)
@@ -1035,6 +1066,8 @@ class Battle(
         if (move.effect == "RANDOM_DAMAGE_1_TO_150_LEVEL") return if (effectiveness(type, m, t) == 0) 0 else m.level
         if (move.effect == "HALVE_HP") return t.hp / 2
         if (move.effect == "SET_HP_EQUAL_TO_USER") return maxOf(0, t.hp - m.hp)
+        if (move.effect == "FINAL_GAMBIT") return if (effectiveness(type, m, t) == 0) 0 else m.hp
+        if (move.effect == "NATURAL_GIFT" && naturalGift(item(m)) == null) return 0
         if (move.effect in setOf("COUNTER", "MIRROR_COAT", "METAL_BURST")) return 0
         val tType = type
         val ab = defAbility(m, t)
@@ -1076,9 +1109,14 @@ class Battle(
             "RANDOM_DAMAGE_1_TO_150_LEVEL" -> maxOf(1, m.level * (50 + rng.next(101)) / 100)
             // Super Fang: halve the target's current HP.
             "HALVE_HP" -> maxOf(1, t.hp / 2)
+            // Final Gambit: deal damage equal to the user's current HP, then the user faints.
+            "FINAL_GAMBIT" -> m.hp
             else -> null
         }
-        if ((e == "SPIT_UP" && m.stockpile == 0) || (e == "FLING" && (item(m) == It.NONE || (data.items[item(m)]?.flingPower ?: 0) == 0))) {
+        if ((e == "SPIT_UP" && m.stockpile == 0) ||
+            (e == "FLING" && (item(m) == It.NONE || (data.items[item(m)]?.flingPower ?: 0) == 0)) ||
+            (e == "NATURAL_GIFT" && naturalGift(item(m)) == null)
+        ) {
             msg("하지만 실패했다!"); return
         }
         if (fixed != null) {
@@ -1091,6 +1129,8 @@ class Battle(
             dealDamage(m, t, move, minOf(fixed, if (t.substituteHp > 0) t.substituteHp else t.hp), 4, false, showEff = false)
             if (e == "ONE_HIT_KO" && t.fainted) msg("일격필살!")
             afterHit(m, t, move, type, listOf(fixed))
+            // Final Gambit: the user faints after dealing damage.
+            if (e == "FINAL_GAMBIT" && !m.fainted) { damage(m, m.hp); faint(m) }
             return
         }
         val eff0 = effectiveness(type, m, t)
@@ -1192,6 +1232,8 @@ class Battle(
         val hitTarget = dealt.isNotEmpty()
         val subHit = total == 0 && hitTarget
         val contact = move.has("CONTACT")
+        // Natural Gift uses up the held berry.
+        if (e == "NATURAL_GIFT" && naturalGift(item(m)) != null && !m.fainted) consumeItem(m)
         // drain
         if (move.drain > 0 && total > 0) {
             var h = maxOf(1, total * move.drain / 100)

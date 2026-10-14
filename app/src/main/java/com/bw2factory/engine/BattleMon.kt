@@ -32,6 +32,13 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var mimicOriginal: Pair<Int, MoveSlot>? = null
     val friendship = info.friendship
 
+    /**
+     * Hidden Power type (engine Type index). Factory Pokémon use one flat IV for all six stats,
+     * so the type bit of every stat is identical: even IV -> type index 0 (Fighting), odd IV ->
+     * index 15 (Dark). Hidden Power type index h maps to engine type h+1.
+     */
+    val hiddenPowerType: Int = if (info.mon.iv % 2 == 0) Types.FIGHTING else Types.DARK
+
     val name: String get() = species.nameKo
     val fainted get() = hp <= 0
 

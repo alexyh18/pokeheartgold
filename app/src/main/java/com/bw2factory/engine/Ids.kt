@@ -217,6 +217,49 @@ object It {
         561 to Types.DRAGON, 562 to Types.DARK, 563 to Types.STEEL, 564 to Types.NORMAL,
     )
 
+    /**
+     * Natural Gift: berry item id -> (type, base power). Gen5 values. Only berries that can be
+     * held in the Battle Subway pool need be present; anything missing makes Natural Gift fail.
+     */
+    val NATURAL_GIFT = mapOf(
+        149 to (Types.FIRE to 60),      // Cheri
+        150 to (Types.WATER to 60),     // Chesto
+        151 to (Types.ELECTRIC to 60),  // Pecha
+        152 to (Types.GRASS to 60),     // Rawst
+        153 to (Types.ICE to 60),       // Aspear
+        154 to (Types.FIGHTING to 60),  // Leppa
+        155 to (Types.POISON to 60),    // Oran
+        156 to (Types.GROUND to 60),    // Persim
+        157 to (Types.FLYING to 60),    // Lum
+        158 to (Types.PSYCHIC to 60),   // Sitrus
+        159 to (Types.BUG to 60),       // Figy
+        160 to (Types.ROCK to 60),      // Wiki
+        161 to (Types.GHOST to 60),     // Mago
+        162 to (Types.DRAGON to 60),    // Aguav
+        163 to (Types.DARK to 60),      // Iapapa
+        184 to (Types.FIRE to 80),      // Occa
+        185 to (Types.WATER to 80),     // Passho
+        186 to (Types.ELECTRIC to 80),  // Wacan
+        187 to (Types.GRASS to 80),     // Rindo
+        188 to (Types.ICE to 80),       // Yache
+        189 to (Types.FIGHTING to 80),  // Chople
+        191 to (Types.GROUND to 80),    // Shuca
+        192 to (Types.FLYING to 80),    // Coba
+        193 to (Types.PSYCHIC to 80),   // Payapa
+        194 to (Types.BUG to 80),       // Tanga
+        195 to (Types.ROCK to 80),      // Charti
+        196 to (Types.GHOST to 80),     // Kasib
+        197 to (Types.DRAGON to 80),    // Haban
+        198 to (Types.DARK to 80),      // Colbur
+        201 to (Types.GRASS to 80),     // Liechi
+        202 to (Types.WATER to 80),     // Ganlon
+        203 to (Types.FIGHTING to 80),  // Salac
+        204 to (Types.POISON to 80),    // Petaya
+        208 to (Types.BUG to 80),       // Enigma
+        210 to (Types.GHOST to 80),     // Custap
+        211 to (Types.DRAGON to 80),    // Jaboca
+    )
+
     fun isBerry(id: Int) = id in 149..212
     fun isChoice(id: Int) = id == CHOICE_BAND || id == CHOICE_SCARF || id == CHOICE_SPECS
 }
