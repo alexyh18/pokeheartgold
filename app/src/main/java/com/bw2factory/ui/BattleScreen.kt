@@ -299,9 +299,11 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
         Spacer(Modifier.height(1.dp))
         Bw2HpBar(v.hpAnim.value, Modifier.fillMaxWidth())
         if (side == 0) {
+            Spacer(Modifier.height(2.dp))
+            Bw2ExpBar(Modifier.fillMaxWidth())
             Text("${v.displayHp} / ${v.maxHp}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
         } else {
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 s.battle.sides[1].party.forEach { p ->
                     Box(Modifier.size(7.dp).clip(RoundedCornerShape(50))
@@ -313,24 +315,43 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
     }
 }
 
-/** The thin black-outlined HP bar with the BW2 green/yellow/red fill and a highlight line. */
+/** The black-outlined HP bar: an orange "HP" tab, a dark track and a green/yellow/red fill with a top highlight. */
 @Composable
 private fun Bw2HpBar(fraction: Float, modifier: Modifier = Modifier) {
     val c = when {
-        fraction > 0.5f -> Color(0xFF40C850) to Color(0xFF80F088)
-        fraction > 0.2f -> Color(0xFFF0C020) to Color(0xFFF8E060)
-        else -> Color(0xFFE84030) to Color(0xFFF88070)
+        fraction > 0.5f -> Color(0xFF40C850) to Color(0xFF88F090)
+        fraction > 0.2f -> Color(0xFFF0C020) to Color(0xFFF8E868)
+        else -> Color(0xFFF04830) to Color(0xFFF89078)
     }
-    Row(modifier.height(9.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.height(10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.width(16.dp).height(9.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFE8A020)),
+            Modifier.width(17.dp).height(10.dp).clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFFF0A830)).border(1.dp, Color(0xFF704818), RoundedCornerShape(3.dp)),
             contentAlignment = Alignment.Center,
         ) { Text("HP", color = Color(0xFF203048), fontSize = 7.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.width(2.dp))
-        Box(Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(1.dp)).background(Color(0xFF101820)).padding(1.dp)) {
+        Box(
+            Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(2.dp))
+                .background(Color(0xFF081018)).border(1.dp, Color(0xFF485868), RoundedCornerShape(2.dp)).padding(1.5.dp),
+        ) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(fraction.coerceIn(0f, 1f)).clip(RoundedCornerShape(1.dp)).background(c.first)) {
                 Box(Modifier.fillMaxWidth().height(2.dp).background(c.second))
             }
+        }
+    }
+}
+
+/** A thin blue EXP bar below the player's HP bar, matching the BW2 player box layout (cosmetic — no leveling). */
+@Composable
+private fun Bw2ExpBar(modifier: Modifier = Modifier) {
+    Row(modifier.height(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.width(17.dp).height(5.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3878C0)),
+            contentAlignment = Alignment.Center,
+        ) { Text("EXP", color = Color.White, fontSize = 5.sp, fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.width(2.dp))
+        Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(1.dp)).background(Color(0xFF081018)).padding(0.5.dp)) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth(0.6f).clip(RoundedCornerShape(1.dp)).background(Color(0xFF48B8E8)))
         }
     }
 }
