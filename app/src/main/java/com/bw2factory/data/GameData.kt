@@ -125,13 +125,17 @@ class GameData(
     val abilities = abilities.associateBy { it.id }
     val sets = sets.associateBy { it.id }
 
-    /** Set ids that belong to the Super Single course (what the Super trainers actually use). */
-    val superSetIds: List<Int> = sets.filter { it.species != 0 && it.superCourse }.map { it.id }
+    /**
+     * Eligible Super Single course sets: a real set used by a Super trainer whose species is fully evolved.
+     * Porygon2 is the one allowed exception (it's an evolution of Porygon, kept at the user's request).
+     */
+    val superSetIds: List<Int> = sets.filter { it.species != 0 && it.superCourse && isSpeciesAllowed(it.species) }.map { it.id }
 
-    /** A set is eligible if it is a real (non-empty) Super course set. */
+    private fun isSpeciesAllowed(sp: Int) = sp == PORYGON2 || (species[sp]?.final ?: false)
+
     fun isEligible(setId: Int): Boolean {
         val s = sets[setId] ?: return false
-        return s.species != 0 && s.superCourse
+        return s.species != 0 && s.superCourse && isSpeciesAllowed(s.species)
     }
 
     fun move(id: Int) = moves.getValue(id)
@@ -151,6 +155,8 @@ class GameData(
 
     companion object {
         const val TYPE_NULL = 17
+        /** Porygon2's national dex id — the one non-final species allowed in the pool. */
+        const val PORYGON2 = 233
         private val json = Json { ignoreUnknownKeys = true }
 
         fun load(read: (String) -> String) = GameData(

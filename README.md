@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.2.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.3.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,10 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.3 변경점
+
+- 슈퍼 코스 풀 중에서 **최종진화체가 아닌 포켓몬은 제외**하되, 폴리곤2만 예외로 유지 (적격 812세트·222종)
 
 ## v2.2 변경점
 
