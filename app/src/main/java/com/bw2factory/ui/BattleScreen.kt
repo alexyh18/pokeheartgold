@@ -56,8 +56,8 @@ fun BattleScreen(vm: GameViewModel, s: BattleSession) {
             Scene(vm, s)
             val density = LocalDensity.current
             val dp = { v: Float -> with(density) { (v * u).toDp() } }
-            HpBox(vm.data, s, 1, Modifier.offset(x = dp(4f), y = dp(8f)).width(dp(120f)))
-            HpBox(vm.data, s, 0, Modifier.offset(x = dp(132f), y = dp(140f)).width(dp(120f)))
+            HpBox(vm.data, s, 1, Modifier.offset(x = dp(4f), y = dp(8f)).width(dp(128f)))
+            HpBox(vm.data, s, 0, Modifier.offset(x = dp(124f), y = dp(140f)).width(dp(128f)))
         }
         MessageBox(s.message)
         Box(
@@ -69,6 +69,7 @@ fun BattleScreen(vm: GameViewModel, s: BattleSession) {
                 InputMode.COMMAND -> CommandMenu(s)
                 InputMode.FIGHT -> FightMenu(vm, s)
                 InputMode.PARTY, InputMode.REPLACE -> PartyMenu(vm, s)
+                InputMode.INFO -> FieldInfo(vm, s)
                 InputMode.NONE -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
                     Text(if (s.fast) "▶▶ 빠르게" else "화면을 탭하면 진행", color = Bw.textDim, fontSize = 12.sp,
                         modifier = Modifier.clickable { s.fast = !s.fast }.padding(6.dp))
@@ -157,9 +158,10 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
     val m = v.mon ?: return
     if (!v.visible && v.faint.value >= 1f) return
     @Suppress("UNUSED_VARIABLE") val tick = v.statusTick
+    // Gentle BW2-style slant. The slant eats `t` px of width on the leading edge, so pad the content
+    // past it (and give the box enough width) to keep "Lv100" and the HP count from being clipped.
     val shape = GenericShape { size, _ ->
-        // parallelogram tilt like the BW2 HUD, slanted toward the screen edge
-        val t = size.height * 0.5f
+        val t = size.height * 0.28f
         if (side == 1) { moveTo(t, 0f); lineTo(size.width, 0f); lineTo(size.width - t, size.height); lineTo(0f, size.height) }
         else { moveTo(0f, 0f); lineTo(size.width - t, 0f); lineTo(size.width, size.height); lineTo(t, size.height) }
         close()
@@ -168,7 +170,7 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
         modifier.clip(shape)
             .background(Brush.verticalGradient(listOf(Color(0xF0384450), Color(0xF01C242C))))
             .border(2.dp, Color(0xFFE8E8F0), shape)
-            .padding(start = if (side == 1) 16.dp else 10.dp, end = if (side == 1) 10.dp else 16.dp, top = 3.dp, bottom = 4.dp),
+            .padding(start = if (side == 1) 18.dp else 12.dp, end = if (side == 1) 12.dp else 18.dp, top = 3.dp, bottom = 4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(m.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -217,6 +219,88 @@ private fun Bw2HpBar(fraction: Float, modifier: Modifier = Modifier) {
     }
 }
 
+/** Field state (weather, rooms, hazards, screens) and both active Pokémon's current stat-stage changes. */
+@Composable
+private fun FieldInfo(vm: GameViewModel, s: BattleSession) {
+    val b = s.battle
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BwPanel(Modifier.fillMaxWidth()) {
+            Text("필드 상태", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Spacer(Modifier.height(2.dp))
+            val field = buildList {
+                when (b.weather) {
+                    Weather.SUN -> add("쾌청" to b.weatherTurns)
+                    Weather.RAIN -> add("비" to b.weatherTurns)
+                    Weather.SAND -> add("모래바람" to b.weatherTurns)
+                    Weather.HAIL -> add("싸라기눈" to b.weatherTurns)
+                    Weather.NONE -> {}
+                }
+                if (b.trickRoom > 0) add("트릭룸" to b.trickRoom)
+                if (b.gravityTurns > 0) add("중력" to b.gravityTurns)
+            }
+            if (field.isEmpty()) Text("특별한 날씨/공간 효과 없음", color = Bw.textDim, fontSize = 12.sp)
+            else field.forEach { (n, t) -> Text("$n  (남은 턴 ${if (t > 0) t else "-"})", color = Bw.text, fontSize = 13.sp) }
+        }
+        listOf(0 to "내 쪽", 1 to "상대 쪽").forEach { (side, label) ->
+            val sd = b.sides[side]
+            BwPanel(Modifier.fillMaxWidth()) {
+                Text(label, color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(Modifier.height(2.dp))
+                val eff = buildList {
+                    if (sd.reflect > 0) add("리플렉터 ${sd.reflect}")
+                    if (sd.lightScreen > 0) add("빛의장막 ${sd.lightScreen}")
+                    if (sd.tailwind > 0) add("순풍 ${sd.tailwind}")
+                    if (sd.safeguard > 0) add("신비의부적 ${sd.safeguard}")
+                    if (sd.mist > 0) add("흰안개 ${sd.mist}")
+                    if (sd.spikes > 0) add("압정뿌리기 ${sd.spikes}겹")
+                    if (sd.toxicSpikes > 0) add("독압정 ${sd.toxicSpikes}겹")
+                    if (sd.stealthRock) add("스텔스록")
+                }
+                if (eff.isEmpty()) Text("설치기/벽 효과 없음", color = Bw.textDim, fontSize = 12.sp)
+                else Text(eff.joinToString(" · "), color = Bw.text, fontSize = 12.sp)
+                val m = sd.mon
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MonIcon(vm.sprites, m.species.id, 28)
+                    Spacer(Modifier.width(4.dp))
+                    Text(m.name, color = Bw.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    StatusBadge(m.status)
+                }
+                val labels = listOf("공격" to Stat.ATK, "방어" to Stat.DEF, "특공" to Stat.SPA, "특방" to Stat.SPD, "스피드" to Stat.SPE, "명중" to Stat.ACC, "회피" to Stat.EVA)
+                val changed = labels.filter { m.stages[it.second] != 0 }
+                if (changed.isEmpty()) Text("랭크 변화 없음", color = Bw.textDim, fontSize = 11.sp)
+                else FlowStages(changed.map { it.first to m.stages[it.second] })
+            }
+        }
+        BwButton("돌아가기", Modifier.fillMaxWidth(), color = Color(0xFF4878B8)) { s.mode = InputMode.COMMAND }
+    }
+}
+
+@Composable
+private fun FlowStages(items: List<Pair<String, Int>>) {
+    Column {
+        items.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (name, stage) ->
+                    val up = stage > 0
+                    Text("$name ${if (up) "+" else ""}$stage", color = if (up) Bw.hpGreen else Bw.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+/** (label, background color) for a move-effectiveness tier, or null when it should not be shown. */
+private fun effTierLabel(tier: Int?): Pair<String, Color>? = when (tier) {
+    null -> "효과 없음" to Color(0xFF606870)
+    2 -> "효과가 매우 굉장" to Color(0xFF1E8A2E)
+    1 -> "효과가 굉장" to Color(0xFF2EA84A)
+    -1 -> "효과가 별로" to Color(0xFFB06030)
+    -2 -> "효과가 매우 별로" to Color(0xFF9A3A2A)
+    else -> null // x1 or status: no label
+}
+
 private fun genderMark(m: BattleMon) = when (m.gender) {
     0 -> "♂" to Color(0xFF68A8F8)
     1 -> "♀" to Color(0xFFF87878)
@@ -245,8 +329,8 @@ private fun CommandMenu(s: BattleSession) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         BwButton("싸우다", Modifier.fillMaxWidth().weight(1.4f), color = Color(0xFFD83838)) { s.mode = InputMode.FIGHT }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BwButton("가방", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFFD8A020), enabled = false) {}
             BwButton("포켓몬", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFF38A848)) { s.mode = InputMode.PARTY }
+            BwButton("필드 정보", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFF4878B8)) { s.mode = InputMode.INFO }
         }
         Text(
             if (s.fast) "메시지 속도: 빠르게 (탭하여 변경)" else "메시지 속도: 보통 (탭하여 변경)",
@@ -286,8 +370,8 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                                 .padding(8.dp),
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            Text(slot.move.nameKo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
-                            Row {
+                            Text(slot.move.nameKo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(data.typeName(slot.move.type), color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, modifier = Modifier.weight(1f))
                                 Text("PP ${slot.pp}/${slot.maxPp}", color = if (slot.pp == 0) Bw.accent else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
@@ -295,8 +379,15 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                                 when (slot.move.category) { "PHYSICAL" -> "물리"; "SPECIAL" -> "특수"; else -> "변화" } +
                                     (if (slot.move.power > 1) " · 위력 ${slot.move.power}" else "") +
                                     (if (slot.move.accuracy in 1..100) " · 명중 ${slot.move.accuracy}" else ""),
-                                color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp, maxLines = 1,
                             )
+                            // effectiveness vs. the current foe
+                            effTierLabel(s.battle.moveEffectivenessTier(m, slot.move))?.let { (txt, bg) ->
+                                Spacer(Modifier.height(2.dp))
+                                Box(Modifier.clip(RoundedCornerShape(3.dp)).background(bg).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                                    Text(txt, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))

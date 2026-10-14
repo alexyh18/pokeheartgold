@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.5.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.6.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,14 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.6 변경점
+
+- 배경을 **일반 싱글 배틀용 필드**로 교체 (이전 배경은 로테이션 배틀용 2중 플랫폼이었음)
+- 상태창의 "Lv100"·HP 수치가 잘리던 문제 수정 (HUD 기울기·여백 조정)
+- 상성 메시지 세분화: 4배 "효과가 매우 굉장했다!", 1/4배 "효과가 매우 별로였다…"
+- 기술 선택창에 상대 기준 상성 표시 (효과가 매우 굉장/굉장/별로/매우 별로/효과 없음)
+- "필드 정보" 버튼 추가: 날씨·트릭룸·중력, 양쪽의 설치기(스텔스록·압정)와 벽(리플렉터 등), 각 포켓몬의 랭크 변화 확인
 
 ## v2.5 변경점
 

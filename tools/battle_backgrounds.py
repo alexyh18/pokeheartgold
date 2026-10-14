@@ -17,14 +17,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHEET = os.path.join(ROOT, "tools", "cache", "b2w2_battle_backgrounds.png")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets", "sprites", "battle_bg")
 
-# name -> (column, top, bottom). The grey star platforms are the battle facility stage at different
-# times of day; "head" (starry sky, gold platforms) is used for the Factory Head.
+# name -> (column, top, bottom). These are the single-battle stages (one far + one near platform),
+# NOT the twin-ring rotation-battle stage. Rows begin at these y offsets on the sheet.
 CELLS = {
-    "facility_0": (3, 1188, 1386),
-    "facility_1": (4, 1188, 1386),
-    "facility_2": (5, 1188, 1386),
-    "facility_3": (6, 1188, 1386),
-    "facility_4": (7, 1191, 1389),
+    "facility_0": (1, 0, 198),      # grass, day
+    "facility_1": (1, 199, 397),    # water, day
+    "facility_2": (1, 398, 596),    # grass, overcast
+    "facility_3": (0, 796, 994),    # sand, dusk
+    "facility_4": (2, 597, 795),    # sand, sunset
 }
 
 

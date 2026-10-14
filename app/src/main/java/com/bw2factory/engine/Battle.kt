@@ -171,6 +171,32 @@ class Battle(
         return q
     }
 
+    /**
+     * Effectiveness label of [move] used by [user] against the current foe, for the move-select UI.
+     * Returns one of -2 (x1/4 or less), -1 (x1/2), 0 (x1 / status / no info), 1 (x2), 2 (x4), or null if immune.
+     */
+    fun moveEffectivenessTier(user: BattleMon, move: MoveData): Int? {
+        if (move.isStatus) return 0
+        val t = foe(user)
+        if (t.fainted) return 0
+        // Abilities that give full immunity to a whole type
+        val a = defAbility(user, t)
+        val type = moveType(user, move)
+        val absorbImmune = (type == Types.ELECTRIC && a in setOf(Ab.VOLT_ABSORB, Ab.MOTOR_DRIVE, Ab.LIGHTNINGROD)) ||
+            (type == Types.WATER && a in setOf(Ab.WATER_ABSORB, Ab.DRY_SKIN, Ab.STORM_DRAIN)) ||
+            (type == Types.FIRE && a == Ab.FLASH_FIRE) || (type == Types.GRASS && a == Ab.SAP_SIPPER)
+        if (absorbImmune) return null
+        val q = effectiveness(type, user, t)
+        return when {
+            q == 0 -> null
+            q <= 1 -> -2
+            q == 2 -> -1
+            q == 4 -> 0
+            q == 8 -> 1
+            else -> 2
+        }
+    }
+
     fun moveType(user: BattleMon, move: MoveData): Int {
         if (move.effect == "CHANGE_TYPE_WITH_WEATHER") {
             return when (effWeather()) {
@@ -1013,9 +1039,12 @@ class Battle(
     }
 
     private suspend fun effMessage(eff: Int, t: BattleMon) {
+        // eff is in quarters: 16 = x4, 8 = x2, 2 = x1/2, 1 = x1/4.
         when {
+            eff >= 16 -> msg("효과가 매우 굉장했다!")
             eff > 4 -> msg("효과가 굉장했다!")
-            eff in 1..3 -> msg("효과가 별로인 듯하다…")
+            eff <= 1 -> msg("효과가 매우 별로였다…")
+            eff in 2..3 -> msg("효과가 별로인 듯하다…")
         }
     }
 

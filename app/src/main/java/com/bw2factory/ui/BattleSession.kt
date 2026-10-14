@@ -36,7 +36,7 @@ class Anim(initial: Float) {
     private companion object { const val FRAME_MS = 16 }
 }
 
-enum class InputMode { NONE, COMMAND, FIGHT, PARTY, REPLACE }
+enum class InputMode { NONE, COMMAND, FIGHT, PARTY, REPLACE, INFO }
 
 /** What the battle screen draws for one side; updated only by battle events so HP/sprites animate in order. */
 class SideView {
