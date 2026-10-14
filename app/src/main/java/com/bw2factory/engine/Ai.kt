@@ -97,7 +97,7 @@ class FactoryAi(private val rng: BattleRandom) {
             "TAUNT" -> if (t.tauntTurns == 0) 20 else -50
             "ENCORE" -> if (t.lastMove?.isStatus == true && t.encoreMove == null) 45 else -50
             "DISABLE" -> if (t.lastMove != null && t.disabledMove == null) 20 else -50
-            "INFATUATE" -> if (!t.infatuated && m.gender != 2 && t.gender != 2 && m.gender != t.gender) 30 else -50
+            "INFATUATE" -> if (t.infatuatedWith == null && m.gender != 2 && t.gender != 2 && m.gender != t.gender) 30 else -50
             "SWITCH_HELD_ITEMS" -> if (It.isChoice(b.item(m))) 40 else 5
             "FORCE_SWITCH" -> if ((1..5).any { t.stages[it] > 0 }) 45 else 5
             "PASS_STATS_AND_STATUS" -> if ((1..5).sumOf { m.stages[it] } >= 2) 40 else -50

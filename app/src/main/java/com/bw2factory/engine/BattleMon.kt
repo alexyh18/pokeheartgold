@@ -57,7 +57,8 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var tormented = false
     var disabledMove: MoveData? = null
     var disableTurns = 0
-    var infatuated = false
+    /** The Pokémon this one is infatuated with; infatuation ends when that Pokémon leaves the field. */
+    var infatuatedWith: BattleMon? = null
     var nightmare = false
     var cursed = false
     var perishCount = -1
@@ -112,7 +113,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         protectCount = 0; protecting = false; enduring = false
         lockedMove = null; lockedTurns = 0; recharging = false; chargingMove = null; semiInvulnerable = null
         encoreMove = null; encoreTurns = 0; tauntTurns = 0; tormented = false
-        disabledMove = null; disableTurns = 0; infatuated = false; nightmare = false; cursed = false
+        disabledMove = null; disableTurns = 0; infatuatedWith = null; nightmare = false; cursed = false
         perishCount = -1; ingrained = false; aquaRing = false; magnetRiseTurns = 0; yawnTurns = 0
         destinyBond = false; grudge = false; foresighted = false; choiceMove = null
         stockpile = 0; stockpileDef = 0; stockpileSpd = 0

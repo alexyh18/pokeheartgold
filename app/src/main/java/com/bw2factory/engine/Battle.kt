@@ -562,7 +562,8 @@ class Battle(
                 msg("${Josa.eunNeun(nm(m))} 눈을 떴다!")
             } else {
                 msg("${Josa.eunNeun(nm(m))} 쿨쿨 잠들어 있다.")
-                if (move.effect != "USE_RANDOM_LEARNED_MOVE_SLEEP") return true
+                // Sleep Talk and Snore are the only moves usable while asleep.
+                if (move.effect != "USE_RANDOM_LEARNED_MOVE_SLEEP" && move.effect != "DAMAGE_WHILE_ASLEEP") return true
             }
         }
         if (m.status == Status.FREEZE) {
@@ -619,11 +620,17 @@ class Battle(
             msg("${Josa.eunNeun(nm(m))} 몸이 저려서 움직일 수 없다!")
             return true
         }
-        if (m.infatuated) {
-            msg("${Josa.eunNeun(nm(m))} ${nm(foe(m))}에게 헤롱헤롱하다!")
-            if (rng.chance(50)) {
-                msg("${Josa.eunNeun(nm(m))} 헤롱헤롱해서 기술을 쓸 수 없었다!")
-                return true
+        // Infatuation only persists while the Pokémon it fell for is still on the field.
+        val crush = m.infatuatedWith
+        if (crush != null) {
+            if (crush.fainted || foe(m) !== crush) {
+                m.infatuatedWith = null
+            } else {
+                msg("${Josa.eunNeun(nm(m))} ${nm(crush)}에게 헤롱헤롱하다!")
+                if (rng.chance(50)) {
+                    msg("${Josa.eunNeun(nm(m))} 헤롱헤롱해서 기술을 쓸 수 없었다!")
+                    return true
+                }
             }
         }
         return false
@@ -759,6 +766,8 @@ class Battle(
         if (e == "RECOVER_DAMAGE_SLEEP" && t.status != Status.SLEEP) {
             msg("${Josa.eunNeun(nm(t))} 영향을 받지 않았다!"); return
         }
+        // Snore can only be used while asleep.
+        if (e == "DAMAGE_WHILE_ASLEEP" && m.status != Status.SLEEP) { msg("하지만 실패했다!"); return }
         if (e == "HALVE_DEFENSE" && sides.any { !it.mon.fainted && ability(it.mon) == Ab.DAMP }) {
             msg("${Josa.eunNeun(nm(m))} ${Josa.eulReul(mvName(move))} 쓸 수 없다!")
             return
@@ -1302,9 +1311,10 @@ class Battle(
                 msg("${nm(t)}의 포자!")
                 trySetStatus(m, listOf(Status.SLEEP, Status.PARALYSIS, Status.POISON)[rng.next(3)], t, silentFail = true)
             }
-            Ab.CUTE_CHARM -> if (rng.chance(30) && m.gender != 2 && t.gender != 2 && m.gender != t.gender && !m.infatuated && ability(m) != Ab.OBLIVIOUS) {
+            // Cute Charm: contact may infatuate the attacker toward the Cute Charm Pokémon (the defender, t).
+            Ab.CUTE_CHARM -> if (rng.chance(30) && m.gender != 2 && t.gender != 2 && m.gender != t.gender && m.infatuatedWith == null && ability(m) != Ab.OBLIVIOUS) {
                 msg("${nm(t)}의 헤롱헤롱바디!")
-                m.infatuated = true
+                m.infatuatedWith = t
                 msg("${Josa.eunNeun(nm(m))} 헤롱헤롱해졌다!")
             }
             Ab.AFTERMATH -> if (t.fainted && !m.fainted && sides.none { ability(it.mon) == Ab.DAMP }) {
@@ -1445,9 +1455,19 @@ class Battle(
                 t.yawnTurns = 2; msg("${Josa.eunNeun(nm(t))} 졸음이 오기 시작했다!")
             } else msg("하지만 실패했다!")
             "INFATUATE" -> when {
-                m.gender == 2 || t.gender == 2 || m.gender == t.gender || t.infatuated -> msg("하지만 실패했다!")
+                // Needs opposite, known genders; fails if already infatuated or the target is Oblivious.
+                m.gender == 2 || t.gender == 2 || m.gender == t.gender || t.infatuatedWith != null -> msg("하지만 실패했다!")
                 defAbility(m, t) == Ab.OBLIVIOUS -> { msg("${nm(t)}의 둔감!"); msg("${Josa.eunNeun(nm(t))} 영향을 받지 않았다!") }
-                else -> { t.infatuated = true; msg("${Josa.eunNeun(nm(t))} 헤롱헤롱해졌다!") }
+                else -> {
+                    t.infatuatedWith = m
+                    msg("${Josa.eunNeun(nm(t))} 헤롱헤롱해졌다!")
+                    // Destiny Knot: the newly infatuated holder infatuates the attacker back.
+                    if (item(t) == It.DESTINY_KNOT && m.infatuatedWith == null && ability(m) != Ab.OBLIVIOUS &&
+                        m.gender != 2 && t.gender != 2 && m.gender != t.gender) {
+                        m.infatuatedWith = t
+                        msg("${nm(t)}의 운명의매듭으로 ${Josa.iGa(nm(m))} 헤롱헤롱해졌다!")
+                    }
+                }
             }
             "DISABLE" -> {
                 val last = t.lastMove

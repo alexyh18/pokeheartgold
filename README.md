@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.6.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.7.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,11 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.7 변경점
+
+- 헤롱헤롱(헤롱헤롱바디 포함) 메커니즘 수정: 상대(반한 대상)가 쓰러지거나 교체로 필드를 떠나면 헤롱헤롱이 풀리고, 운명의매듭이면 상대도 헤롱헤롱에 걸림
+- 잠든 상태 전용 기술 수정: 코골기도 잠든 상태에서 쓸 수 있게 됨(기존엔 잠꼬대만 허용), 코골기·잠꼬대는 깨어 있을 때 쓰면 실패
 
 ## v2.6 변경점
 
