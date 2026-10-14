@@ -196,6 +196,16 @@ def main():
     # The battle code addresses sets and trainers by their arc file index, which is the order.json position.
     set_index = {name: i for i, name in enumerate(order["pokemon"])}
 
+    # Sets that appear in the Super course: those used by any Super Single trainer (order.json indices
+    # 110-299, the sSuperTrainerRanges/last/top pools) plus the Super Single boss (index 307).
+    super_trainer_idx = set(range(110, 300)) | {307}
+    super_set_ids = set()
+    for ti in super_trainer_idx:
+        if ti >= len(order["trainers"]):
+            continue
+        tj = json.load(open(os.path.join(SUBWAY, "trainers", order["trainers"][ti] + ".json"), encoding="utf-8"))
+        super_set_ids.update(set_index[s] for s in tj["pokemon"])
+
     # ---- sets (Battle Subway: 1000 named sets, in order.json order)
     sets, used_species, used_moves, used_items = {}, set(), set(), set()
     for name, i in set_index.items():
@@ -219,6 +229,7 @@ def main():
             # HP, Atk, Def, Spe, SpA, SpD (BSubwayPokemonData.evFlags bit order)
             "evs": [ev["hp"], ev["attack"], ev["defense"], ev["speed"], ev["special_attack"], ev["special_defense"]],
             "nature": bw_nat[j["nature"]], "item": item, "form": j["form"],
+            "super": i in super_set_ids,  # used by a Super Single trainer
         }
         used_species.add(j["species"])
 

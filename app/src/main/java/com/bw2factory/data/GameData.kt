@@ -1,5 +1,6 @@
 package com.bw2factory.data
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -89,6 +90,8 @@ data class FactorySet(
     val nature: Int,
     val item: Int,
     val form: Int,
+    /** true if this set is used by a Super Single trainer (the Super course pool) */
+    @SerialName("super") val superCourse: Boolean = true,
 )
 
 /** A frontier trainer from HGSS files/a/2/0/2 (name from msg_0027, class from msg_0730). */
@@ -122,12 +125,13 @@ class GameData(
     val abilities = abilities.associateBy { it.id }
     val sets = sets.associateBy { it.id }
 
-    /** Set ids whose species is fully evolved (used for the "final evolutions only" pools). */
-    val finalEvoSetIds: List<Int> = sets.filter { it.species != 0 && species.first { s -> s.id == it.species }.final }.map { it.id }
+    /** Set ids that belong to the Super Single course (what the Super trainers actually use). */
+    val superSetIds: List<Int> = sets.filter { it.species != 0 && it.superCourse }.map { it.id }
 
-    fun isFinalEvo(setId: Int): Boolean {
-        val sp = sets[setId]?.species ?: return false
-        return sp != 0 && (this.species[sp]?.final ?: false)
+    /** A set is eligible if it is a real (non-empty) Super course set. */
+    fun isEligible(setId: Int): Boolean {
+        val s = sets[setId] ?: return false
+        return s.species != 0 && s.superCourse
     }
 
     fun move(id: Int) = moves.getValue(id)
