@@ -87,7 +87,7 @@ fun TypeBadge(data: GameData, type: Int) {
 
 /** BW-style menu window: rounded dark-navy panel with a bright double border and a subtle inner sheen. */
 @Composable
-fun BwPanel(modifier: Modifier = Modifier, selected: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+fun BwPanel(modifier: Modifier = Modifier, selected: Boolean = false, dense: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         modifier
@@ -96,7 +96,7 @@ fun BwPanel(modifier: Modifier = Modifier, selected: Boolean = false, content: @
             .border(if (selected) 3.dp else 2.dp, if (selected) Bw.gold else Color(0xFF8FB0C8), shape)
             .padding(2.dp)
             .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
-            .padding(8.dp),
+            .padding(if (dense) 6.dp else 8.dp),
         content = content,
     )
 }
@@ -184,26 +184,36 @@ fun StatusBadge(s: Status) {
 @Composable
 fun MonCard(vm: GameViewModel, info: MonInfo, selectedIndex: Int?, modifier: Modifier = Modifier, onClick: (() -> Unit)?) {
     val data = vm.data
-    BwPanel(modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier), selected = selectedIndex != null) {
+    // Compact so a full set of six fits on screen without scrolling (dense = tighter padding/fonts).
+    BwPanel(
+        modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        selected = selectedIndex != null,
+        dense = true,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PixelImage(vm.sprites.front(info.species.id), Modifier.size(64.dp))
-            Spacer(Modifier.width(6.dp))
+            PixelImage(vm.sprites.front(info.species.id), Modifier.size(44.dp))
+            Spacer(Modifier.width(5.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(info.species.nameKo, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(info.species.nameKo, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    Spacer(Modifier.width(4.dp))
+                    info.species.types.forEach { TypeBadge(data, it); Spacer(Modifier.width(2.dp)) }
                     if (selectedIndex != null) {
-                        Spacer(Modifier.width(6.dp))
-                        Box(Modifier.clip(RoundedCornerShape(50)).background(Bw.gold).padding(horizontal = 6.dp)) {
-                            Text("${selectedIndex + 1}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Box(Modifier.clip(RoundedCornerShape(50)).background(Bw.gold).padding(horizontal = 5.dp)) {
+                            Text("${selectedIndex + 1}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) { info.species.types.forEach { TypeBadge(data, it) } }
-                Text("특성 ${data.abilityName(info.ability)}", color = Bw.textDim, fontSize = 11.sp)
-                Text("도구 ${data.itemName(info.set.item)}", color = Bw.textDim, fontSize = 11.sp)
+                Text("특성 ${data.abilityName(info.ability)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1)
+                Text("도구 ${data.itemName(info.set.item)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1)
+                val st = info.stats
+                Text(
+                    "H${st[Stat.HP]} 공${st[Stat.ATK]} 방${st[Stat.DEF]} 특공${st[Stat.SPA]} 특방${st[Stat.SPD]} 속${st[Stat.SPE]}",
+                    color = Bw.textDim, fontSize = 9.sp, maxLines = 1,
+                )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(3.dp))
         val moves = info.set.moves.map { data.move(it) }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             moves.chunked(2).forEach { row ->
@@ -212,18 +222,11 @@ fun MonCard(vm: GameViewModel, info: MonInfo, selectedIndex: Int?, modifier: Mod
                         Box(
                             Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(m.type).copy(alpha = 0.85f))
                                 .padding(horizontal = 4.dp, vertical = 2.dp),
-                        ) { Text(m.nameKo, color = Color.White, fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Bold) }
+                        ) { Text(m.nameKo, color = Color.White, fontSize = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold) }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
-        Spacer(Modifier.height(3.dp))
-        val st = info.stats
-        Text(
-            "HP${st[Stat.HP]} 공${st[Stat.ATK]} 방${st[Stat.DEF]} 특공${st[Stat.SPA]} 특방${st[Stat.SPD]} 스${st[Stat.SPE]}",
-            color = Bw.textDim, fontSize = 10.sp,
-        )
-        Text("${data.natures.getOrNull(info.set.nature)?.nameKo ?: ""} · IV ${info.mon.iv} · Lv.${info.mon.level}", color = Bw.textDim, fontSize = 10.sp)
     }
 }

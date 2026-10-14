@@ -12,7 +12,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.18.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.19.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -26,6 +26,12 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.19 변경점
+
+- 일루전(일루전/조로아크) 특성 구현: 등장 시 파티의 마지막(기절하지 않은) 포켓몬의 모습·이름으로 둔갑하고, 공격 기술에 맞으면 둔갑이 풀림("일루전이 풀렸다!"). 교체·기절 시에도 본모습으로 돌아옴
+- 속임수 데미지 메커니즘 구현: 사용자가 아니라 상대의 공격 능력치(랭크 포함)로 데미지를 계산
+- 렌탈 선택 화면과 포켓몬 능력치 카드 UI를 압축해, 작은 화면에서도 스크롤 없이 6마리 전부와 버튼이 보이도록 조정(스프라이트·여백·글자 크기 축소, 능력치 한 줄 표기)
 
 ## v2.18 변경점
 

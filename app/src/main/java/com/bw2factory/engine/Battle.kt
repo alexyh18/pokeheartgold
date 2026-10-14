@@ -80,7 +80,8 @@ class Battle(
     fun sideOf(m: BattleMon) = sides[m.side]
 
     // ------------------------------------------------------------------ text helpers
-    fun nm(m: BattleMon) = if (m.side == 1) "상대 ${m.name}" else m.name
+    // Uses displayName so an Illusion (일루전) shows its disguise in every battle message.
+    fun nm(m: BattleMon) = if (m.side == 1) "상대 ${m.displayName}" else m.displayName
     private fun mvName(m: MoveData) = m.nameKo
     private fun itName(i: Int) = data.itemName(i)
     private fun abName(a: Int) = data.abilityName(a)
@@ -261,9 +262,11 @@ class Battle(
     suspend fun run(): Int {
         try {
             val foeSide = sides[1]
-            msg("${Josa.eunNeun(foeSide.trainerLabel)} ${Josa.eulReul(foeSide.mon.name)} 내보냈다!")
+            setupIllusion(foeSide.mon)
+            setupIllusion(sides[0].mon)
+            msg("${Josa.eunNeun(foeSide.trainerLabel)} ${Josa.eulReul(foeSide.mon.displayName)} 내보냈다!")
             emit(BattleEvent.SendOut(1, foeSide.mon))
-            msg("가랏! ${sides[0].mon.name}!")
+            msg("가랏! ${sides[0].mon.displayName}!")
             emit(BattleEvent.SendOut(0, sides[0].mon))
             sides.forEach { it.mon.turnsOnField = 0 }
             for (m in bySpeed(listOf(sides[0].mon, sides[1].mon))) onEntry(m)
@@ -424,7 +427,8 @@ class Battle(
         val f = foe(m)
         if (f.bindTurns > 0) { f.bindTurns = 0 }
         if (f.trapped) f.trapped = false
-        if (side == 0) msg("가랏! ${m.name}!") else msg("${Josa.eunNeun(s.trainerLabel)} ${Josa.eulReul(m.name)} 내보냈다!")
+        setupIllusion(m)
+        if (side == 0) msg("가랏! ${m.displayName}!") else msg("${Josa.eunNeun(s.trainerLabel)} ${Josa.eulReul(m.displayName)} 내보냈다!")
         emit(BattleEvent.SendOut(side, m))
         entryHazards(m)
         if (!m.fainted) onEntry(m)
@@ -480,6 +484,28 @@ class Battle(
                 }
             }
         }
+    }
+
+    /**
+     * Illusion (일루전): on entry a Zoroark disguises as the LAST non-fainted party member (name + sprite).
+     * Call this right after the mon becomes active and before its send-out message so the disguise is
+     * reflected everywhere. No-op if the ability isn't Illusion or there is no other healthy party member.
+     */
+    private fun setupIllusion(m: BattleMon) {
+        m.illusionSpecies = -1; m.illusionName = null
+        if (ability(m) != Ab.ILLUSION) return
+        val disguise = sideOf(m).party.lastOrNull { it !== m && !it.fainted } ?: return
+        if (disguise === m) return
+        m.illusionSpecies = disguise.species.id
+        m.illusionName = disguise.species.nameKo
+    }
+
+    /** Drops the disguise (on taking a damaging hit, or on faint) and refreshes the UI if it was up. */
+    private suspend fun breakIllusion(m: BattleMon) {
+        if (!m.illusionActive) return
+        m.illusionSpecies = -1; m.illusionName = null
+        msg("${nm(m)}의 일루전이 풀렸다!")
+        emit(BattleEvent.SendOut(m.side, m))
     }
 
     private suspend fun onEntry(m: BattleMon) {
@@ -543,7 +569,8 @@ class Battle(
                 s.active = idx
                 val m = s.mon
                 m.resetVolatile()
-                if (i == 0) msg("가랏! ${m.name}!") else msg("${Josa.eunNeun(s.trainerLabel)} ${Josa.eulReul(m.name)} 내보냈다!")
+                setupIllusion(m)
+                if (i == 0) msg("가랏! ${m.displayName}!") else msg("${Josa.eunNeun(s.trainerLabel)} ${Josa.eulReul(m.displayName)} 내보냈다!")
                 emit(BattleEvent.SendOut(i, m))
                 entered += m
             }
@@ -1017,29 +1044,35 @@ class Battle(
         val physical = move.isPhysical
         val ai = if (physical) Stat.ATK else Stat.SPA
         val di = if (physical) Stat.DEF else Stat.SPD
-        var aStage = m.stages[ai]
+        // Foul Play (속임수): compute damage from the TARGET's Attack stat (and the target's Atk stage),
+        // not the user's. The user's own attack-boosting ability/item then do not apply.
+        val foulPlay = move.effect == "FOUL_PLAY"
+        val atkMon = if (foulPlay) t else m
+        var aStage = atkMon.stages[ai]
         var dStage = t.stages[di]
         if (crit) { aStage = maxOf(0, aStage); dStage = minOf(0, dStage) }
         // Unaware ignores the other side's relevant stat stages.
-        if (ability(t) == Ab.UNAWARE) aStage = 0
+        if (ability(t) == Ab.UNAWARE && !foulPlay) aStage = 0
         if (ability(m) == Ab.UNAWARE) dStage = 0
-        var atk = stageMul(m.stats[ai], aStage)
+        var atk = stageMul(atkMon.stats[ai], aStage)
         var def = stageMul(t.stats[di], dStage)
         val a = ability(m)
-        if (physical && a == Ab.PURE_POWER) atk *= 2
-        if (physical && a == Ab.HUSTLE) atk = atk * 3 / 2
-        var ar = 0x1000
-        if (physical && a == Ab.GUTS && m.status != Status.NONE) ar = chain(ar, 0x1800)
-        if (a == Ab.SLOW_START && physical && m.slowStartTurns < 5) ar = chain(ar, 0x800)
-        if (m.flashFire && type == Types.FIRE) ar = chain(ar, 0x1800)
-        if (m.hp * 3 <= m.maxHp) {
-            if ((a == Ab.OVERGROW && type == Types.GRASS) || (a == Ab.BLAZE && type == Types.FIRE) ||
-                (a == Ab.TORRENT && type == Types.WATER) || (a == Ab.SWARM && type == Types.BUG)) ar = chain(ar, 0x1800)
-        }
         val it = item(m)
-        if (it == It.CHOICE_BAND && physical) ar = chain(ar, 0x1800)
-        if (it == It.CHOICE_SPECS && !physical) ar = chain(ar, 0x1800)
-        if (it == It.THICK_CLUB && physical && m.species.id in setOf(104, 105)) ar = chain(ar, 0x2000)
+        var ar = 0x1000
+        if (!foulPlay) {
+            if (physical && a == Ab.PURE_POWER) atk *= 2
+            if (physical && a == Ab.HUSTLE) atk = atk * 3 / 2
+            if (physical && a == Ab.GUTS && m.status != Status.NONE) ar = chain(ar, 0x1800)
+            if (a == Ab.SLOW_START && physical && m.slowStartTurns < 5) ar = chain(ar, 0x800)
+            if (m.flashFire && type == Types.FIRE) ar = chain(ar, 0x1800)
+            if (m.hp * 3 <= m.maxHp) {
+                if ((a == Ab.OVERGROW && type == Types.GRASS) || (a == Ab.BLAZE && type == Types.FIRE) ||
+                    (a == Ab.TORRENT && type == Types.WATER) || (a == Ab.SWARM && type == Types.BUG)) ar = chain(ar, 0x1800)
+            }
+            if (it == It.CHOICE_BAND && physical) ar = chain(ar, 0x1800)
+            if (it == It.CHOICE_SPECS && !physical) ar = chain(ar, 0x1800)
+            if (it == It.THICK_CLUB && physical && m.species.id in setOf(104, 105)) ar = chain(ar, 0x2000)
+        }
         val da = defAbility(m, t)
         if (da == Ab.THICK_FAT && (type == Types.FIRE || type == Types.ICE)) ar = chain(ar, 0x800)
         atk = maxOf(1, fixedRound(atk, ar))
@@ -1242,6 +1275,8 @@ class Battle(
         if (t.status == Status.FREEZE && moveType(m, move) == Types.FIRE && !t.fainted) {
             t.status = Status.NONE; emit(BattleEvent.StatusChanged(t.side)); msg("${Josa.eunNeun(nm(t))} 얼음 상태가 나았다!")
         }
+        // Illusion drops the moment the disguised mon takes a direct hit from a damaging move.
+        if (t.illusionActive) breakIllusion(t)
         if (!t.fainted) hpTriggers(t)
         return d
     }
@@ -1996,6 +2031,8 @@ class Battle(
     private suspend fun faint(m: BattleMon) {
         if (!m.fainted || m in announcedFaint) return
         announcedFaint += m
+        // Reveal the real species before the faint message/animation (no "풀렸다" line here).
+        m.illusionSpecies = -1; m.illusionName = null
         m.lockedMove = null; m.chargingMove = null; m.semiInvulnerable = null
         emit(BattleEvent.Faint(m.side))
         msg("${Josa.eunNeun(nm(m))} 쓰러졌다!")

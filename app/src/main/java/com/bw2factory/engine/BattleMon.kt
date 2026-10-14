@@ -40,6 +40,17 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     val hiddenPowerType: Int = if (info.mon.iv % 2 == 0) Types.FIGHTING else Types.DARK
 
     val name: String get() = species.nameKo
+
+    // ---- Illusion (일루전): while active, the mon is shown as another party member.
+    /** Species id to display instead of the real one, or -1 when no illusion is active. */
+    var illusionSpecies: Int = -1
+    /** Korean name to display instead of the real one, or null when no illusion is active. */
+    var illusionName: String? = null
+    val illusionActive: Boolean get() = illusionSpecies >= 0
+    /** The species id the UI should draw (the disguise while Illusion is up). */
+    val displaySpecies: Int get() = if (illusionSpecies >= 0) illusionSpecies else species.id
+    /** The name the UI/messages should show (the disguise while Illusion is up). */
+    val displayName: String get() = illusionName ?: species.nameKo
     val fainted get() = hp <= 0
 
     // ---- volatile state (reset on switch)
@@ -131,6 +142,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         minimized = false; roosted = false; abilitySuppressed = false; turnsOnField = 0
         usedMoves.clear(); metronomeCount = 0; metronomeMove = null; focusPunchCharging = false
         focusEnergy = false; healBlockTurns = 0; embargoTurns = 0; wishTurns = 0; wishHp = 0; gemConsumedType = -1
+        illusionSpecies = -1; illusionName = null
         if (powerTrick) {
             powerTrick = false
             stats = baseStats.copyOf()

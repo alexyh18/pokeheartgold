@@ -116,17 +116,17 @@ private fun ConfirmDialog(title: String, body: String, confirm: String, onConfir
 private fun RentalScreen(vm: GameViewModel) {
     val s = vm.state
     val picks = remember(s.rentals) { mutableStateListOf<Int>() }
-    Column(Modifier.fillMaxSize().padding(8.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp)) {
         HintPanel(vm)
         Text(
-            "렌탈 포켓몬 6마리 중 3마리를 고르세요. 처음 고른 포켓몬이 선두로 나갑니다.",
-            color = Bw.text, fontSize = 13.sp, modifier = Modifier.padding(4.dp),
+            "6마리 중 3마리를 고르세요. 처음 고른 포켓몬이 선두입니다.",
+            color = Bw.text, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
         )
         LazyVerticalGrid(
             GridCells.Fixed(2),
             Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             itemsIndexed(s.rentals) { i, mon ->
                 val info = remember(mon) { MonInfo(vm.data, mon) }
@@ -291,10 +291,10 @@ fun HintPanel(vm: GameViewModel, showTrainer: Boolean = true) {
     val s = vm.state
     val hint = vm.hint ?: return
     val t = vm.trainer()
-    BwPanel(Modifier.fillMaxWidth(), selected = vm.isBoss) {
+    BwPanel(Modifier.fillMaxWidth(), selected = vm.isBoss, dense = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (showTrainer) {
-                PixelImage(vm.sprites.trainer(t.sprite), Modifier.size(width = 43.dp, height = 64.dp))
+                PixelImage(vm.sprites.trainer(t.sprite), Modifier.size(width = 36.dp, height = 54.dp))
                 Spacer(Modifier.width(8.dp))
             }
             Column(Modifier.weight(1f)) {
@@ -312,8 +312,8 @@ fun HintPanel(vm: GameViewModel, showTrainer: Boolean = true) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             hint.species.forEach { sp ->
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    PixelImage(vm.sprites.front(sp), Modifier.size(52.dp))
-                                    Text(vm.data.species.getValue(sp).nameKo, color = Bw.text, fontSize = 11.sp)
+                                    PixelImage(vm.sprites.front(sp), Modifier.size(42.dp))
+                                    Text(vm.data.species.getValue(sp).nameKo, color = Bw.text, fontSize = 10.sp)
                                 }
                             }
                             if (hint.species.size < 3) Text("+ ?", color = Bw.textDim, fontSize = 16.sp, fontWeight = FontWeight.Bold)

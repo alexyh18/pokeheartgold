@@ -94,8 +94,9 @@ fun BattleScreen(vm: GameViewModel, s: BattleSession) {
 private fun Scene(vm: GameViewModel, s: BattleSession) {
     val foe = s.views[1]
     val me = s.views[0]
-    val foeBmp = foe.mon?.let { vm.sprites.front(it.species.id) }
-    val myBmp = me.mon?.let { vm.sprites.back(it.species.id) }
+    // displaySpecies reflects an active Illusion (일루전) disguise.
+    val foeBmp = foe.mon?.let { vm.sprites.front(it.displaySpecies) }
+    val myBmp = me.mon?.let { vm.sprites.back(it.displaySpecies) }
     // read animated values so the canvas redraws
     val fe = foe.enter.value; val ff = foe.faint.value; val fs = foe.shake.value; val fl = foe.lunge.value
     val me1 = me.enter.value; val mf = me.faint.value; val ms = me.shake.value; val ml = me.lunge.value
@@ -289,7 +290,7 @@ private fun HpBox(data: GameData, s: BattleSession, side: Int, modifier: Modifie
             .padding(start = if (side == 1) 18.dp else 12.dp, end = if (side == 1) 12.dp else 18.dp, top = 3.dp, bottom = 4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(m.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(m.displayName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             genderMark(m)?.let { (t, c) -> Text(t, color = c, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             if (m.status.ordinal != 0) { Spacer(Modifier.width(4.dp)); StatusBadge(m.status) }
             Spacer(Modifier.weight(1f))
@@ -398,9 +399,9 @@ private fun FieldInfo(vm: GameViewModel, s: BattleSession) {
                 val m = sd.mon
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    MonIcon(vm.sprites, m.species.id, 28)
+                    MonIcon(vm.sprites, m.displaySpecies, 28)
                     Spacer(Modifier.width(4.dp))
-                    Text(m.name, color = Bw.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(m.displayName, color = Bw.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(4.dp))
                     StatusBadge(m.status)
                 }
@@ -602,32 +603,31 @@ private fun MonSummary(vm: GameViewModel, s: BattleSession, idx: Int, canSwitch:
     val m = s.player.party[idx]
     val data = vm.data
     val isActive = idx == s.player.active && !forced
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        BwPanel(Modifier.fillMaxWidth()) {
+    // Compact enough to fit without scrolling; the scroll stays only as a safety net on tiny screens.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        BwPanel(Modifier.fillMaxWidth(), dense = true) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PixelImage(vm.sprites.front(m.species.id), Modifier.size(56.dp))
+                PixelImage(vm.sprites.front(m.species.id), Modifier.size(46.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(m.name, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text(m.name, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        genderMark(m)?.let { (t, c) -> Spacer(Modifier.width(3.dp)); Text(t, color = c, fontSize = 13.sp) }
                         Spacer(Modifier.width(4.dp))
-                        genderMark(m)?.let { (t, c) -> Text(t, color = c, fontSize = 14.sp) }
+                        Text("Lv${m.level}", color = Bw.textDim, fontSize = 12.sp)
                         Spacer(Modifier.width(6.dp))
-                        Text("Lv${m.level}", color = Bw.textDim, fontSize = 13.sp)
+                        m.species.types.forEach { TypeBadge(data, it); Spacer(Modifier.width(2.dp)) }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) { m.species.types.forEach { TypeBadge(data, it) } }
-                    Text("특성 ${data.abilityName(m.ability)}", color = Bw.textDim, fontSize = 12.sp)
-                    Text("도구 ${data.itemName(m.item)}", color = Bw.textDim, fontSize = 12.sp)
+                    Text("특성 ${data.abilityName(m.ability)} · 도구 ${data.itemName(m.item)}",
+                        color = Bw.textDim, fontSize = 11.sp, maxLines = 1)
+                    Spacer(Modifier.height(2.dp))
+                    HpBar(m.hp.toFloat() / m.maxHp, Modifier.fillMaxWidth())
+                    Text("HP ${m.hp} / ${m.maxHp}", color = Bw.text, fontSize = 11.sp, modifier = Modifier.align(Alignment.End))
                 }
             }
-            Spacer(Modifier.height(4.dp))
-            HpBar(m.hp.toFloat() / m.maxHp, Modifier.fillMaxWidth())
-            Text("HP ${m.hp} / ${m.maxHp}", color = Bw.text, fontSize = 12.sp, modifier = Modifier.align(Alignment.End))
         }
         // stats with stage arrows (current battle stat vs base, so held-item/ability effects show)
-        BwPanel(Modifier.fillMaxWidth()) {
-            Text("능력치", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Spacer(Modifier.height(2.dp))
+        BwPanel(Modifier.fillMaxWidth(), dense = true) {
             val labels = listOf("공격" to Stat.ATK, "방어" to Stat.DEF, "특공" to Stat.SPA, "특방" to Stat.SPD, "스피드" to Stat.SPE)
             labels.forEach { (name, stat) ->
                 val stage = m.stages[stat]
@@ -641,28 +641,24 @@ private fun MonSummary(vm: GameViewModel, s: BattleSession, idx: Int, canSwitch:
                 }
             }
             val nat = data.natures.getOrNull(m.info.set.nature)?.nameKo ?: ""
-            Text("성격 $nat · 개체값 ${m.info.mon.iv}", color = Bw.textDim, fontSize = 11.sp)
+            Text("성격 $nat · 개체값 ${m.info.mon.iv}", color = Bw.textDim, fontSize = 10.sp)
         }
         // moves
-        BwPanel(Modifier.fillMaxWidth()) {
-            Text("기술", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Spacer(Modifier.height(2.dp))
+        BwPanel(Modifier.fillMaxWidth(), dense = true) {
             m.moves.forEach { slot ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(slot.move.type)).width(44.dp).padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(slot.move.type)).width(42.dp).padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
                         Text(data.typeName(slot.move.type), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.width(6.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(slot.move.nameKo, color = Bw.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text(
-                            when (slot.move.category) { "PHYSICAL" -> "물리"; "SPECIAL" -> "특수"; else -> "변화" } +
-                                (if (slot.move.power > 1) " · 위력 ${slot.move.power}" else "") +
-                                (if (slot.move.accuracy in 1..100) " · 명중 ${slot.move.accuracy}" else " · 명중 -"),
-                            color = Bw.textDim, fontSize = 10.sp,
-                        )
-                    }
-                    Text("PP ${slot.pp}/${slot.maxPp}", color = if (slot.pp == 0) Bw.accent else Bw.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(slot.move.nameKo, color = Bw.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text(
+                        when (slot.move.category) { "PHYSICAL" -> "물리"; "SPECIAL" -> "특수"; else -> "변화" } +
+                            (if (slot.move.power > 1) " ${slot.move.power}" else ""),
+                        color = Bw.textDim, fontSize = 10.sp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("PP ${slot.pp}/${slot.maxPp}", color = if (slot.pp == 0) Bw.accent else Bw.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
