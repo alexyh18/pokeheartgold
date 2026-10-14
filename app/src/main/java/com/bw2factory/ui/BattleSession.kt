@@ -38,6 +38,11 @@ class Anim(initial: Float) {
 
 enum class InputMode { NONE, COMMAND, FIGHT, PARTY, REPLACE, INFO }
 
+/** A single move's visual effect, drawn procedurally from its type and category. */
+class MoveEffect(val from: Int, val to: Int, val type: Int, val category: String) {
+    val anim = Anim(0f)
+}
+
 /** What the battle screen draws for one side; updated only by battle events so HP/sprites animate in order. */
 class SideView {
     var mon by mutableStateOf<BattleMon?>(null)
@@ -52,6 +57,8 @@ class SideView {
     val shake = Anim(0f)
     val lunge = Anim(0f)
     var flashUp by mutableStateOf<Boolean?>(null)
+    /** continuous idle bob phase (0..1 looping), advanced by the UI's frame loop */
+    var idle by mutableFloatStateOf(0f)
 }
 
 /**
@@ -73,13 +80,23 @@ class BattleSession(
     var message by mutableStateOf("")
     var mode by mutableStateOf(InputMode.NONE)
     var weather by mutableStateOf(Weather.NONE)
-    var fast by mutableStateOf(false)
+    /** Message/animation speed: 0 slow, 1 normal, 2 fast. */
+    var speed by mutableIntStateOf(1)
+    val fast get() = speed == 2
+    private val msgDelay get() = when (speed) { 0 -> 1700L; 2 -> 350L; else -> 1000L }
+    private val animScale get() = when (speed) { 0 -> 1.4f; 2 -> 0.5f; else -> 1f }
+
+    /** The currently playing move effect, drawn procedurally over the scene. */
+    var effect by mutableStateOf<MoveEffect?>(null)
 
     private var tap: CompletableDeferred<Unit>? = null
     private var actionReply: CompletableDeferred<Action>? = null
     private var replaceReply: CompletableDeferred<Int>? = null
 
     fun onTap() { tap?.complete(Unit) }
+
+    fun cycleSpeed() { speed = (speed + 1) % 3 }
+    val speedLabel get() = when (speed) { 0 -> "느림"; 2 -> "빠름"; else -> "보통" }
 
     fun choose(a: Action) {
         mode = InputMode.NONE
@@ -129,7 +146,7 @@ class BattleSession(
     private suspend fun waitMessage() {
         val d = CompletableDeferred<Unit>()
         tap = d
-        withTimeoutOrNull(if (fast) 450L else 1100L) { d.await() }
+        withTimeoutOrNull(msgDelay) { d.await() }
         tap = null
     }
 
@@ -156,12 +173,13 @@ class BattleSession(
                 val v = views[e.side]
                 val target = e.to.toFloat() / e.max
                 val steps = 20
+                val dur = (550 * animScale).toLong()
                 coroutineScope {
-                    launch { v.hpAnim.animateTo(target, if (fast) 250 else 550) }
+                    launch { v.hpAnim.animateTo(target, dur.toInt()) }
                     launch {
                         for (i in 1..steps) {
                             v.displayHp = e.from + (e.to - e.from) * i / steps
-                            delay((if (fast) 250L else 550L) / steps)
+                            delay(dur / steps)
                         }
                         v.displayHp = e.to
                     }
@@ -176,18 +194,27 @@ class BattleSession(
             is BattleEvent.UseMove -> {
                 val v = views[e.side]
                 v.lunge.snapTo(0f)
-                v.lunge.animateTo(1f, 120); v.lunge.animateTo(0f, 120)
+                val d = (120 * animScale).toInt().coerceAtLeast(1)
+                v.lunge.animateTo(1f, d); v.lunge.animateTo(0f, d)
+                // Play a type/category-based effect travelling toward the target, unless it's a self move.
+                if (!e.move.targetsSelf && !e.move.targetsField) {
+                    val eff = MoveEffect(from = e.side, to = 1 - e.side, type = e.move.type, category = e.move.category)
+                    effect = eff
+                    eff.anim.animateTo(1f, (520 * animScale).toInt().coerceAtLeast(1))
+                    if (effect === eff) effect = null
+                }
             }
             is BattleEvent.Hit -> {
                 val v = views[e.side]
+                val d = (45 * animScale).toInt().coerceAtLeast(1)
                 repeat(if (e.effectiveness > 4) 4 else 3) {
-                    v.shake.animateTo(1f, 45); v.shake.animateTo(0f, 45)
+                    v.shake.animateTo(1f, d); v.shake.animateTo(0f, d)
                 }
             }
             is BattleEvent.StatAnim -> {
                 val v = views[e.side]
                 v.flashUp = e.up
-                delay(350)
+                delay((350 * animScale).toLong())
                 v.flashUp = null
             }
             is BattleEvent.Hidden -> views[e.side].hidden = e.hidden

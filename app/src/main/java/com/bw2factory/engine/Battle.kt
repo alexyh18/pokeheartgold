@@ -1029,7 +1029,9 @@ class Battle(
         if (move.isStatus) return 0
         val type = moveType(m, move)
         if (move.effect == "ONE_HIT_KO") return if (effectiveness(type, m, t) == 0 || defAbility(m, t) == Ab.STURDY) 0 else t.hp * 30 / 100
-        if (move.key in setOf("seismic_toss", "night_shade")) return m.level
+        if (move.effect == "LEVEL_DAMAGE_FLAT") return if (effectiveness(type, m, t) == 0) 0 else m.level
+        if (move.effect == "RANDOM_DAMAGE_1_TO_150_LEVEL") return if (effectiveness(type, m, t) == 0) 0 else m.level
+        if (move.effect == "HALVE_HP") return t.hp / 2
         if (move.effect == "SET_HP_EQUAL_TO_USER") return maxOf(0, t.hp - m.hp)
         if (move.effect in setOf("COUNTER", "MIRROR_COAT", "METAL_BURST")) return 0
         val tType = type
@@ -1066,6 +1068,12 @@ class Battle(
             "METAL_BURST" -> if (m.lastHitBy === t && (m.lastDamagePhysical + m.lastDamageSpecial) > 0) (m.lastDamagePhysical + m.lastDamageSpecial) * 3 / 2 else -1
             "SET_HP_EQUAL_TO_USER" -> if (t.hp > m.hp) t.hp - m.hp else -1
             "ONE_HIT_KO" -> t.hp
+            // Night Shade / Seismic Toss: fixed damage equal to the user's level.
+            "LEVEL_DAMAGE_FLAT" -> m.level
+            // Psywave: 0.5x..1.5x the user's level, random.
+            "RANDOM_DAMAGE_1_TO_150_LEVEL" -> maxOf(1, m.level * (50 + rng.next(101)) / 100)
+            // Super Fang: halve the target's current HP.
+            "HALVE_HP" -> maxOf(1, t.hp / 2)
             else -> null
         }
         if ((e == "SPIT_UP" && m.stockpile == 0) || (e == "FLING" && (item(m) == It.NONE || (data.items[item(m)]?.flingPower ?: 0) == 0))) {

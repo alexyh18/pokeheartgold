@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.7.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.8.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,13 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.8 변경점
+
+- 나이트헤드/지구던지기 수정: 위력 공식이 아니라 자신의 레벨과 같은 고정 데미지를 줌(고스트 면역 등 상성은 유지). 사이코웨이브(랜덤)·분노의앞니(HP 절반)도 고정 데미지로 처리
+- 기술 이펙트 추가: 특수기는 타입 색의 탄환이 상대로 날아가고, 물리기는 명중 순간 타입 색 충격, 변화기는 상대 주위에 반짝임(코드로 그린 오리지널 연출)
+- 포켓몬 idle 애니메이션 추가: 필드 위 포켓몬이 가볍게 위아래로 흔들림
+- 진행 속도 설정 추가: 느림/보통/빠름 3단계 (메시지 대기·애니메이션 속도에 반영, 커맨드창·진행 안내에서 탭하여 변경)
 
 ## v2.7 변경점
 

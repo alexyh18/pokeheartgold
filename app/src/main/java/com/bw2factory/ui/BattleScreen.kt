@@ -46,6 +46,16 @@ private const val SCENE_H = 192f
 
 @Composable
 fun BattleScreen(vm: GameViewModel, s: BattleSession) {
+    // Continuous idle-bob clock: advance each visible Pokémon's phase ~60fps.
+    LaunchedEffect(Unit) {
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val dt = (now - last) / 1_000_000_000f
+            last = now
+            for (v in s.views) if (v.visible) v.idle = (v.idle + dt * 0.6f) % 1f
+        }
+    }
     Column(
         Modifier.fillMaxSize().clickable(
             interactionSource = remember { MutableInteractionSource() }, indication = null,
@@ -71,8 +81,8 @@ fun BattleScreen(vm: GameViewModel, s: BattleSession) {
                 InputMode.PARTY, InputMode.REPLACE -> PartyMenu(vm, s)
                 InputMode.INFO -> FieldInfo(vm, s)
                 InputMode.NONE -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
-                    Text(if (s.fast) "▶▶ 빠르게" else "화면을 탭하면 진행", color = Bw.textDim, fontSize = 12.sp,
-                        modifier = Modifier.clickable { s.fast = !s.fast }.padding(6.dp))
+                    Text("진행 속도: ${s.speedLabel} (탭하여 변경) · 화면을 탭하면 진행", color = Bw.textDim, fontSize = 12.sp,
+                        modifier = Modifier.clickable { s.cycleSpeed() }.padding(6.dp))
                 }
             }
         }
@@ -95,14 +105,17 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
         // Battle Subway stage background (250x198 rip, stretched to the 256x192 top screen)
         if (bg != null) drawPixel(bg, Offset.Zero, size)
         else drawRect(Brush.verticalGradient(listOf(Color(0xFF68B0E8), Color(0xFF4E8C3C))), size = size)
+        // gentle idle bob (vertical) so the Pokémon don't look frozen
+        val foeBob = sin(foe.idle * 2f * Math.PI.toFloat()) * 2.5f * u
+        val myBob = sin((me.idle + 0.5f) * 2f * Math.PI.toFloat()) * 3f * u
         // foe (front sprite, 96x96) stands on the far platform near (186, 98); slides in from the right
         if (foeBmp != null && (foe.visible || ff < 1f) && !foe.hidden) {
             val sz = 96 * u
             val slide = (1f - (if (foe.visible) fe else 1f)) * 60 * u
             val x = (186 - 48) * u + sin(fs * Math.PI.toFloat()) * 4 * u - fl * 10 * u + slide
-            val y = (110 - 96) * u + ff * 40 * u
+            val y = (110 - 96) * u + ff * 40 * u + (if (ff == 0f) foeBob else 0f)
             val a = (if (foe.visible) fe else 1f) * (1f - ff)
-            spriteShadow(x, y, sz, 0.86f, a)
+            spriteShadow(x, (110 - 96) * u + ff * 40 * u, sz, 0.86f, a)
             sprite(foeBmp, x, y, sz, alpha = a, flash = foe.flashUp)
         }
         // player (back sprite, scaled up like BW's closer camera) on the near platform; slides in from the left
@@ -110,10 +123,17 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
             val sz = 132 * u
             val slide = (1f - (if (me.visible) me1 else 1f)) * 70 * u
             val x = (78 - 66) * u + sin(ms * Math.PI.toFloat()) * 4 * u + ml * 12 * u - slide
-            val y = (196 - 132) * u + mf * 50 * u
+            val y = (196 - 132) * u + mf * 50 * u + (if (mf == 0f) myBob else 0f)
             val a = (if (me.visible) me1 else 1f) * (1f - mf)
-            spriteShadow(x, y, sz, 0.9f, a)
+            spriteShadow(x, (196 - 132) * u + mf * 50 * u, sz, 0.9f, a)
             sprite(myBmp, x, y, sz, alpha = a, flash = me.flashUp)
+        }
+        // move effect overlay (procedural): travels from the user toward the target
+        s.effect?.let { eff ->
+            val p = eff.anim.value
+            val src = if (eff.from == 1) Offset((186) * u, (62) * u) else Offset((78) * u, (150) * u)
+            val dst = if (eff.to == 1) Offset((186) * u, (56) * u) else Offset((78) * u, (150) * u)
+            drawMoveEffect(eff.type, eff.category, p, src, dst, u)
         }
         // weather tint
         val tint = when (weather) {
@@ -126,6 +146,53 @@ private fun Scene(vm: GameViewModel, s: BattleSession) {
         if (tint != null) drawRect(tint, size = size)
     }
 }
+
+/**
+ * Original, procedurally-drawn move effect (not from any game art).
+ * Physical: an impact burst of streaks at the target. Special: a projectile with a trail flying src->dst.
+ * Status: a ring of sparkles around the target. Colored by the move's type.
+ */
+private fun DrawScope.drawMoveEffect(type: Int, category: String, p: Float, src: Offset, dst: Offset, u: Float) {
+    if (p <= 0f || p >= 1f) return
+    val col = Bw.typeColor(type)
+    when (category) {
+        "SPECIAL" -> {
+            val pos = Offset(src.x + (dst.x - src.x) * p, src.y + (dst.y - src.y) * p)
+            // trailing orbs
+            for (k in 0..4) {
+                val tp = (p - k * 0.06f).coerceAtLeast(0f)
+                val tpos = Offset(src.x + (dst.x - src.x) * tp, src.y + (dst.y - src.y) * tp)
+                drawCircle(col.copy(alpha = (0.5f - k * 0.09f).coerceAtLeast(0f)), (7f - k) * u, tpos)
+            }
+            drawCircle(Color.White.copy(alpha = 0.9f), 4f * u, pos)
+            drawCircle(col, 8f * u, pos, alpha = 0.8f)
+        }
+        "PHYSICAL" -> {
+            // impact only in the second half, as the hit lands
+            if (p < 0.45f) return
+            val k = (p - 0.45f) / 0.55f
+            val r = (6f + k * 20f) * u
+            val a = (1f - k) * 0.85f
+            for (i in 0 until 8) {
+                val ang = i * (Math.PI.toFloat() / 4f) + k
+                val len = r * (0.7f + 0.3f * sin((i * 1.3f)))
+                drawLine(col.copy(alpha = a), dst, Offset(dst.x + cosf(ang) * len, dst.y + sinf(ang) * len), 3f * u)
+            }
+            drawCircle(Color.White.copy(alpha = a * 0.6f), 4f * u, dst)
+        }
+        else -> { // status: sparkle ring around the target
+            val a = (1f - kotlin.math.abs(p - 0.5f) * 2f).coerceIn(0f, 1f)
+            for (i in 0 until 6) {
+                val ang = i * (Math.PI.toFloat() / 3f) + p * 6f
+                val rr = 16f * u
+                drawCircle(col.copy(alpha = a * 0.8f), 2.5f * u, Offset(dst.x + cosf(ang) * rr, dst.y + sinf(ang) * rr))
+            }
+        }
+    }
+}
+
+private fun cosf(a: Float) = kotlin.math.cos(a)
+private fun sinf(a: Float) = kotlin.math.sin(a)
 
 /** Soft elliptical drop shadow under a sprite, anchored to the platform. */
 private fun DrawScope.spriteShadow(x: Float, y: Float, sz: Float, foot: Float, alpha: Float) {
@@ -333,9 +400,9 @@ private fun CommandMenu(s: BattleSession) {
             BwButton("필드 정보", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFF4878B8)) { s.mode = InputMode.INFO }
         }
         Text(
-            if (s.fast) "메시지 속도: 빠르게 (탭하여 변경)" else "메시지 속도: 보통 (탭하여 변경)",
+            "진행 속도: ${s.speedLabel} (탭하여 변경)",
             color = Bw.textDim, fontSize = 11.sp,
-            modifier = Modifier.align(Alignment.End).clickable { s.fast = !s.fast },
+            modifier = Modifier.align(Alignment.End).clickable { s.cycleSpeed() },
         )
         if (s.battle.usableSlots(m).isEmpty()) Text("쓸 수 있는 기술이 없다! 싸우다를 누르면 발버둥을 쓴다.", color = Bw.accent, fontSize = 11.sp)
     }
