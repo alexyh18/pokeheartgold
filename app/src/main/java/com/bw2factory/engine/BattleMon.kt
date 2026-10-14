@@ -98,6 +98,12 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var metronomeCount = 0
     var metronomeMove: MoveData? = null
     var focusPunchCharging = false
+    var focusEnergy = false
+    var healBlockTurns = 0
+    var embargoTurns = 0
+    var wishTurns = 0
+    var wishHp = 0
+    var gemConsumedType = -1
 
     fun resetVolatile() {
         types = species.types.toMutableList()
@@ -116,6 +122,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         truantLoafing = false; slowStartTurns = 0; flashFire = false; charged = false; chargeTurnsLeft = 0
         minimized = false; roosted = false; abilitySuppressed = false; turnsOnField = 0
         usedMoves.clear(); metronomeCount = 0; metronomeMove = null; focusPunchCharging = false
+        focusEnergy = false; healBlockTurns = 0; embargoTurns = 0; wishTurns = 0; wishHp = 0; gemConsumedType = -1
         if (powerTrick) {
             powerTrick = false
             stats = baseStats.copyOf()

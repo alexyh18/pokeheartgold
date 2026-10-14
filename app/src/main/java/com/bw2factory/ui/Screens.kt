@@ -60,7 +60,7 @@ private fun Header(vm: GameViewModel) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("배틀팩토리 · 오픈레벨", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("배틀서브웨이 · 슈퍼싱글", color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(
                 if (s.phase == Phase.LOST) s.phase.title
                 else "라운드 ${s.round + 1} · ${s.battleInRound + 1}번째 배틀 · ${s.phase.title}",
@@ -151,7 +151,7 @@ private fun PreBattleScreen(vm: GameViewModel) {
             Text("직전 배틀: $it", color = Bw.textDim, fontSize = 12.sp)
             Spacer(Modifier.height(4.dp))
         }
-        BwPanel(Modifier.fillMaxWidth(), selected = vm.isFactoryHead) {
+        BwPanel(Modifier.fillMaxWidth(), selected = vm.isBoss) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PixelImage(vm.sprites.trainer(t.sprite), Modifier.size(width = 86.dp * 1.2f, height = 128.dp * 1.2f))
                 Spacer(Modifier.width(10.dp))
@@ -160,9 +160,9 @@ private fun PreBattleScreen(vm: GameViewModel) {
                     Text(t.classKo, color = Bw.textDim, fontSize = 13.sp)
                     Text(t.name, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                     Spacer(Modifier.height(6.dp))
-                    if (vm.isFactoryHead) {
+                    if (vm.isBoss) {
                         Text(
-                            if (s.trainerId == FactoryRules.THORTON_SILVER) "팩토리헤드가 나타났다! 이기면 실버 프린트!" else "팩토리헤드와의 재대결! 이기면 골드 프린트!",
+                            "배틀서브웨이 보스가 기다리고 있다! 이기면 7연전 클리어!",
                             color = Bw.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                         )
                     } else {
@@ -218,8 +218,7 @@ private fun RoundClearScreen(vm: GameViewModel) {
     CenterMessage(
         title = "라운드 ${s.round} 클리어!",
         body = "7연전을 모두 이겼습니다!\n현재 ${s.streak}연승 · 기록이 저장되었습니다.\n" +
-            (if (s.streak == 21) "실버 프린트를 손에 넣었다!\n" else "") +
-            (if (s.streak == 49) "골드 프린트를 손에 넣었다!\n" else "") +
+            (if (s.streak == 49) "배틀서브웨이 보스를 쓰러뜨렸다!\n" else "") +
             "다음 라운드에서는 새로운 렌탈 포켓몬을 고릅니다.",
         button = "다음 라운드로",
     ) { vm.nextRound() }
@@ -254,7 +253,7 @@ fun HintPanel(vm: GameViewModel, showTrainer: Boolean = true) {
     val s = vm.state
     val hint = vm.hint ?: return
     val t = vm.trainer()
-    BwPanel(Modifier.fillMaxWidth(), selected = vm.isFactoryHead) {
+    BwPanel(Modifier.fillMaxWidth(), selected = vm.isBoss) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (showTrainer) {
                 PixelImage(vm.sprites.trainer(t.sprite), Modifier.size(width = 43.dp, height = 64.dp))

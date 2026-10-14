@@ -39,6 +39,10 @@ class Side(val index: Int, val party: List<BattleMon>, val trainerLabel: String)
     var spikes = 0
     var toxicSpikes = 0
     var stealthRock = false
+    var tailwind = 0
+    var safeguard = 0
+    var mist = 0
+    var healingWish = false
     var futureSightTurns = 0
     var futureSightUser: BattleMon? = null
     var futureSightMove: MoveData? = null
@@ -61,6 +65,7 @@ class Battle(
     var weather = Weather.NONE
     var weatherTurns = 0
     var trickRoom = 0
+    var gravityTurns = 0
     var turn = 0
     var winner = -1
         private set
@@ -93,10 +98,7 @@ class Battle(
 
     fun item(m: BattleMon) = if (ability(m) == Ab.KLUTZ) It.NONE else m.item
 
-    fun effWeather(): Weather {
-        if (sides.any { !it.mon.fainted && ability(it.mon) == Ab.CLOUD_NINE }) return Weather.NONE
-        return weather
-    }
+    fun effWeather(): Weather = weather
 
     fun grounded(m: BattleMon): Boolean {
         if (item(m) == It.IRON_BALL || m.ingrained) return true
@@ -105,6 +107,20 @@ class Battle(
         if (m.magnetRiseTurns > 0) return false
         return true
     }
+
+    /** Stat changes for boost moves whose data has none (effect name encodes them). */
+    private fun statlessBoost(e: String): List<com.bw2factory.data.StatChangeData> = when (e) {
+        "QUIVER_DANCE" -> listOf(sc("SPA", 1), sc("SPD", 1), sc("SPE", 1))
+        "SHIFT_GEAR" -> listOf(sc("ATK", 1), sc("SPE", 2))
+        "COIL" -> listOf(sc("ATK", 1), sc("DEF", 1), sc("ACC", 1))
+        "HONE_CLAWS" -> listOf(sc("ATK", 1), sc("ACC", 1))
+        "WORK_UP" -> listOf(sc("ATK", 1), sc("SPA", 1))
+        "COTTON_GUARD" -> listOf(sc("DEF", 3))
+        "DEF_UP_DOUBLE_ROLLOUT_POWER" -> listOf(sc("DEF", 1))
+        else -> emptyList()
+    }
+
+    private fun sc(stat: String, stages: Int) = com.bw2factory.data.StatChangeData(stat, stages, 0)
 
     private fun stageMul(v: Int, stage: Int): Int {
         val s = stage.coerceIn(-6, 6)
@@ -118,10 +134,12 @@ class Battle(
         when (ability(m)) {
             Ab.SWIFT_SWIM -> if (w == Weather.RAIN) r = chain(r, 0x2000)
             Ab.CHLOROPHYLL -> if (w == Weather.SUN) r = chain(r, 0x2000)
+            Ab.SAND_RUSH -> if (w == Weather.SAND) r = chain(r, 0x2000)
             Ab.QUICK_FEET -> if (m.status != Status.NONE) r = chain(r, 0x1800)
             Ab.UNBURDEN -> if (m.item == It.NONE && m.lostItem != 0) r = chain(r, 0x2000)
             Ab.SLOW_START -> if (m.slowStartTurns < 5) r = chain(r, 0x800)
         }
+        if (sideOf(m).tailwind > 0) r = chain(r, 0x2000)
         when (item(m)) {
             It.CHOICE_SCARF -> r = chain(r, 0x1800)
             It.IRON_BALL -> r = chain(r, 0x800)
@@ -347,6 +365,9 @@ class Battle(
             if (ability(old) == Ab.NATURAL_CURE && old.status != Status.NONE) {
                 old.status = Status.NONE
             }
+            if (ability(old) == Ab.REGENERATOR && old.hp < old.maxHp) {
+                old.hp = minOf(old.maxHp, old.hp + old.maxHp / 3)
+            }
             if (announce) msg(if (side == 0) "돌아와, ${old.name}!" else "${Josa.eunNeun(s.trainerLabel)} ${Josa.eulReul(old.name)} 넣어 버렸다!")
             emit(BattleEvent.Withdraw(side))
         }
@@ -386,6 +407,14 @@ class Battle(
 
     private suspend fun entryHazards(m: BattleMon) {
         val s = sideOf(m)
+        if (ability(m) == Ab.MAGIC_GUARD) {
+            // Still absorbs/sets Toxic Spikes, but takes no Spikes/Stealth Rock damage.
+            if (grounded(m) && s.toxicSpikes > 0) {
+                if (m.hasType(Types.POISON)) { s.toxicSpikes = 0; msg("${nm(m)}의 발밑에서 독압정이 사라졌다!") }
+                else if (!m.hasType(Types.STEEL)) trySetStatus(m, if (s.toxicSpikes >= 2) Status.TOXIC else Status.POISON, null, silentFail = true)
+            }
+            return
+        }
         if (s.stealthRock) {
             val q = effectiveness(Types.ROCK, null, m)
             val dmg = maxOf(1, m.maxHp * q / 32)
@@ -446,9 +475,7 @@ class Battle(
                 val best = f.moves.maxByOrNull { forewarnPower(it.move) }
                 if (best != null) msg("${nm(m)}의 위험예지로 ${nm(f)}의 ${Josa.eulReul(mvName(best.move))} 꿰뚫어 보았다!")
             }
-            Ab.CLOUD_NINE -> msg("날씨의 영향이 없어졌다!")
         }
-        // Air Lock / Cloud Nine aside, ability-set weather lasts while the user is out (permanent in Gen 5).
     }
 
     private fun forewarnPower(m: MoveData): Int = when {
@@ -769,6 +796,9 @@ class Battle(
             type == Types.WATER && a == Ab.STORM_DRAIN -> {
                 msg("${nm(t)}의 ${abName(a)}!"); changeStage(t, Stat.SPA, 1, t); return true
             }
+            type == Types.GRASS && a == Ab.SAP_SIPPER && !move.isStatus -> {
+                msg("${nm(t)}의 초식!"); changeStage(t, Stat.ATK, 1, t); return true
+            }
             type == Types.FIRE && a == Ab.FLASH_FIRE && t.status != Status.FREEZE && (move.isStatus.not() || move.key == "will_o_wisp") -> {
                 msg("${nm(t)}의 ${abName(a)}!")
                 if (!t.flashFire) { t.flashFire = true; msg("${nm(t)}의 불꽃의 위력이 올라갔다!") }
@@ -857,6 +887,11 @@ class Battle(
         val a = ability(m)
         if (a == Ab.TECHNICIAN && p <= 60) r = chain(r, 0x1800)
         if (a == Ab.RIVALRY && m.gender != 2 && t.gender != 2) r = chain(r, if (m.gender == t.gender) 0x1400 else 0xC00)
+        if (a == Ab.IRON_FIST && move.has("PUNCH")) r = chain(r, 0x1333)
+        if (a == Ab.RECKLESS && move.effect.startsWith("RECOIL")) r = chain(r, 0x1333)
+        if (a == Ab.SHEER_FORCE && hasSecondary(move)) r = chain(r, 0x14CC)
+        if (a == Ab.SAND_FORCE && effWeather() == Weather.SAND && type in setOf(Types.ROCK, Types.GROUND, Types.STEEL)) r = chain(r, 0x14CC)
+        if (a == Ab.DEFEATIST && m.hp * 2 <= m.maxHp) r = chain(r, 0x800)
         val da = defAbility(m, t)
         if (da == Ab.HEATPROOF && type == Types.FIRE) r = chain(r, 0x800)
         if (da == Ab.DRY_SKIN && type == Types.FIRE) r = chain(r, 0x1400)
@@ -864,8 +899,18 @@ class Battle(
         if (it == It.MUSCLE_BAND && move.isPhysical) r = chain(r, 0x1199)
         if (it == It.WISE_GLASSES && move.isSpecial) r = chain(r, 0x1199)
         if (It.TYPE_BOOST[it] == type) r = chain(r, 0x1333)
+        if (It.GEMS[it] == type) { r = chain(r, 0x1800); m.gemConsumedType = type }
         if (m.charged && type == Types.ELECTRIC) r = chain(r, 0x2000)
         return maxOf(1, fixedRound(p, r))
+    }
+
+    /** A move Sheer Force boosts (it has a chance-based secondary) and whose secondary is then skipped. */
+    private fun hasSecondary(m: MoveData): Boolean {
+        if (m.isStatus) return false
+        if (m.flinch > 0) return true
+        if (m.inflict != "NONE" && m.inflictChance > 0) return true
+        if (m.stats.any { it.chance > 0 }) return true
+        return m.effect in setOf("RAISE_ALL_STATS_HIT", "RAISE_ATTACK_HIT", "RAISE_DEF_HIT", "RAISE_SP_ATK_HIT")
     }
 
     private class DamageResult(val damage: Int, val crit: Boolean, val eff: Int)
@@ -877,6 +922,7 @@ class Battle(
         val critBlocked = defAbility(m, t) in setOf(Ab.BATTLE_ARMOR, Ab.SHELL_ARMOR)
         var stage = move.crit
         if (ability(m) == Ab.SUPER_LUCK) stage++
+        if (m.focusEnergy) stage += 2
         if (item(m) in setOf(It.SCOPE_LENS, It.RAZOR_CLAW)) stage++
         val crit = forceCrit ?: (!critBlocked && rng.next(intArrayOf(16, 8, 4, 3, 2)[stage.coerceIn(0, 4)]) == 0)
         val power = movePower(m, t, move, type, pursuitBoost)
@@ -887,6 +933,9 @@ class Battle(
         var aStage = m.stages[ai]
         var dStage = t.stages[di]
         if (crit) { aStage = maxOf(0, aStage); dStage = minOf(0, dStage) }
+        // Unaware ignores the other side's relevant stat stages.
+        if (ability(t) == Ab.UNAWARE) aStage = 0
+        if (ability(m) == Ab.UNAWARE) dStage = 0
         var atk = stageMul(m.stats[ai], aStage)
         var def = stageMul(t.stats[di], dStage)
         val a = ability(m)
@@ -1108,16 +1157,25 @@ class Battle(
             "RECOIL_HALF" -> 2
             else -> 0
         }
-        if (recoilDiv > 0 && total > 0 && ability(m) != Ab.ROCK_HEAD && !m.fainted) {
+        if (recoilDiv > 0 && total > 0 && ability(m) !in setOf(Ab.ROCK_HEAD, Ab.MAGIC_GUARD) && !m.fainted) {
             msg("${Josa.eunNeun(nm(m))} 공격의 반동으로 데미지를 입었다!")
             damage(m, maxOf(1, total / recoilDiv))
         }
-        if (e == "STRUGGLE" && !m.fainted) {
+        if (e == "STRUGGLE" && !m.fainted && ability(m) != Ab.MAGIC_GUARD) {
             msg("${Josa.eunNeun(nm(m))} 공격의 반동으로 데미지를 입었다!")
             damage(m, maxOf(1, m.maxHp / 4))
         }
+        // consume a used gem
+        if (m.gemConsumedType == type && item(m) in It.GEMS && !m.fainted) {
+            msg("${nm(m)}은 ${itName(m.item)}로 위력을 높였다!")
+            consumeItem(m)
+        }
+        m.gemConsumedType = -1
         // contact abilities of the target
         if (contact && hitTarget && !subHit && !m.fainted) contactAbility(m, t)
+        // Poison Touch: contact may poison the target
+        if (contact && hitTarget && !subHit && !t.fainted && ability(m) == Ab.POISON_TOUCH && rng.chance(30))
+            trySetStatus(t, Status.POISON, m, silentFail = true)
         // secondary effects (not through a substitute)
         if (hitTarget && !subHit) secondary(m, t, move, type, total)
         // self-affecting effects that happen even through a substitute
@@ -1148,7 +1206,7 @@ class Battle(
         val it = item(m)
         if (total > 0 && !m.fainted) {
             if (it == It.SHELL_BELL) { if (m.hp < m.maxHp) { heal(m, maxOf(1, total / 8)); msg("${Josa.eunNeun(nm(m))} 조개껍질방울로 체력을 조금 회복했다!") } }
-            if (it == It.LIFE_ORB) { damage(m, maxOf(1, m.maxHp / 10)); msg("${Josa.eunNeun(nm(m))} 생명이 조금 깎였다!") }
+            if (it == It.LIFE_ORB && ability(m) != Ab.MAGIC_GUARD) { damage(m, maxOf(1, m.maxHp / 10)); msg("${Josa.eunNeun(nm(m))} 생명이 조금 깎였다!") }
         }
         if (e == "FLING" && m.item != It.NONE) {
             val flung = m.item
@@ -1159,6 +1217,10 @@ class Battle(
                 It.WHITE_HERB -> Unit
                 else -> if (It.isBerry(flung)) eatBerry(t, flung, forced = true)
             }
+        }
+        // Moxie: raise Attack when the user KOs the target
+        if (t.fainted && !m.fainted && ability(m) == Ab.MOXIE && m.stages[Stat.ATK] < 6) {
+            msg("${nm(m)}의 자기과신!"); changeStage(m, Stat.ATK, 1, m)
         }
         // faints
         if (t.fainted) {
@@ -1200,11 +1262,28 @@ class Battle(
                 damage(m, maxOf(1, m.maxHp / 4))
                 if (m.fainted) faint(m)
             }
+            Ab.ROUGH_SKIN, Ab.IRON_BARBS -> if (!m.fainted && ability(m) != Ab.MAGIC_GUARD) {
+                msg("${nm(t)}의 ${abName(a)}!")
+                damage(m, maxOf(1, m.maxHp / 8))
+                if (m.fainted) faint(m)
+            }
+            Ab.MUMMY -> if (!m.fainted && ability(m) != Ab.MUMMY) {
+                m.ability = Ab.MUMMY; msg("${nm(m)}의 특성이 미라가 되었다!")
+            }
+            Ab.CURSED_BODY -> if (!m.fainted && m.disabledMove == null && rng.chance(30)) {
+                m.lastMove?.let { m.disabledMove = it; m.disableTurns = 4; msg("${nm(m)}의 ${Josa.eulReul(mvName(it))} 사슬묶기 당했다!") }
+            }
+            Ab.WEAK_ARMOR -> if (!t.fainted) {
+                changeStage(t, Stat.DEF, -1, t, fromAbility = true, failMsg = false)
+                changeStage(t, Stat.SPE, 1, t, fromAbility = true, failMsg = false)
+            }
         }
     }
 
     private suspend fun secondary(m: BattleMon, t: BattleMon, move: MoveData, type: Int, total: Int) {
         val e = move.effect
+        // Sheer Force removes the move's added effects (and already boosted its power).
+        if (ability(m) == Ab.SHEER_FORCE && hasSecondary(move)) return
         val serene = if (ability(m) == Ab.SERENE_GRACE) 2 else 1
         fun roll(chance: Int) = chance >= 100 || rng.next(100) < chance * serene
         // status
@@ -1286,8 +1365,26 @@ class Battle(
                 changeStage(t, Stat.ATK, 2, m)
                 tryConfuse(t, m, silentFail = false)
             }
-            "ACC_DOWN", "ATK_DOWN_2", "DEF_DOWN_2", "SPEED_DOWN_2", "SP_DEF_DOWN_2" ->
+            // Stat-lowering moves aimed at the foe (Growl, Leer, Tail Whip, String Shot, Tickle, Captivate, …).
+            "ACC_DOWN", "ATK_DOWN", "ATK_DOWN_2", "DEF_DOWN", "DEF_DOWN_2", "SPEED_DOWN", "SPEED_DOWN_2",
+            "SP_DEF_DOWN_2", "ATK_DEF_DOWN" ->
                 for (s in move.stats) changeStage(t, Stat.parse(s.stat), s.stages, m, failMsg = true)
+            "SP_ATK_DOWN_2_OPPOSITE_GENDER" -> {
+                if (m.gender != 2 && t.gender != 2 && m.gender != t.gender && defAbility(m, t) != Ab.OBLIVIOUS)
+                    changeStage(t, Stat.SPA, -2, m, failMsg = true)
+                else msg("하지만 실패했다!")
+            }
+            "SP_ATK_UP_CAUSE_CONFUSION" -> { changeStage(t, Stat.SPA, 1, m); tryConfuse(t, m, silentFail = false) }
+            "RESET_STAT_CHANGES" -> {
+                for (x in sides) x.mon.stages.fill(0)
+                msg("모든 포켓몬의 능력 변화가 원래대로 되돌아갔다!")
+            }
+            "SIMPLE_BEAM", "ENTRAINMENT", "REFLECT_TYPE", "POWER_SPLIT", "GUARD_SPLIT", "TELEKINESIS",
+            "IGNORE_EVATION_REMOVE_DARK_IMMUNE", "QUASH", "MAKE_SHARED_MOVES_UNUSEABLE", "HEAL_PULSE" ->
+                msg("하지만 실패했다!")
+            "STATUS_POISON" -> trySetStatus(t, Status.POISON, m)
+            "PREVENT_HEALING" -> if (t.healBlockTurns > 0) msg("하지만 실패했다!") else { t.healBlockTurns = 5; msg("${nm(t)}은 회복기술을 쓸 수 없게 되었다!") }
+            "PREVENT_ITEM_USE" -> if (t.embargoTurns > 0) msg("하지만 실패했다!") else { t.embargoTurns = 5; msg("${nm(t)}은 도구를 쓸 수 없게 되었다!") }
             "STATUS_LEECH_SEED" -> when {
                 t.hasType(Types.GRASS) -> msg("${nm(t)}에게는 효과가 없는 것 같다…")
                 t.leechSeeded -> msg("하지만 실패했다!")
@@ -1412,12 +1509,55 @@ class Battle(
     private suspend fun selfMove(m: BattleMon, move: MoveData) {
         val e = move.effect
         val f = foe(m)
+        if (m.healBlockTurns > 0 && move.has("HEAL")) {
+            msg("${Josa.eunNeun(nm(m))} 회복봉인으로 기술을 쓸 수 없다!")
+            return
+        }
         when (e) {
+            // Any self-targeting stat-boost move, driven by its stat_changes data
+            // (Swords Dance, Calm Mind, Quiver Dance, Shift Gear, Coil, Hone Claws, Work Up, Cotton Guard, …).
             "ATK_UP", "ATK_UP_2", "DEF_UP_2", "SPEED_UP_2", "SP_DEF_UP_2", "SP_ATK_UP_2", "EVA_UP", "ATK_DEF_UP",
-            "ATK_SPD_UP", "SP_ATK_SP_DEF_UP", "DEF_SPD_UP" -> {
-                if (move.stats.all { m.stages[Stat.parse(it.stat)] >= 6 }) { msg("${nm(m)}의 능력은 더 이상 올라가지 않는다!"); return }
-                for (s in move.stats) changeStage(m, Stat.parse(s.stat), s.stages, m)
+            "ATK_SPD_UP", "SP_ATK_SP_DEF_UP", "DEF_SPD_UP", "QUIVER_DANCE", "SHIFT_GEAR", "COIL", "HONE_CLAWS",
+            "WORK_UP", "COTTON_GUARD", "DEF_UP_DOUBLE_ROLLOUT_POWER" -> {
+                val stats = move.stats.ifEmpty { statlessBoost(e) }
+                if (stats.isNotEmpty() && stats.all { m.stages[Stat.parse(it.stat).coerceAtLeast(1)] >= 6 && it.stages > 0 }) {
+                    msg("${nm(m)}의 능력은 더 이상 올라가지 않는다!"); return
+                }
+                for (s in stats) changeStage(m, Stat.parse(s.stat), s.stages, m)
             }
+            "SHELL_SMASH" -> {
+                changeStage(m, Stat.DEF, -1, m, failMsg = false); changeStage(m, Stat.SPD, -1, m, failMsg = false)
+                changeStage(m, Stat.ATK, 2, m); changeStage(m, Stat.SPA, 2, m); changeStage(m, Stat.SPE, 2, m)
+            }
+            "AUTOTOMIZE" -> changeStage(m, Stat.SPE, 2, m)
+            "CRIT_UP_2" -> if (m.focusEnergy) msg("하지만 실패했다!") else { m.focusEnergy = true; msg("${nm(m)}은 힘이 넘쳐흐른다!") }
+            "DOUBLE_SPEED_3_TURNS" -> {
+                val s = sideOf(m)
+                if (s.tailwind > 0) msg("하지만 실패했다!") else { s.tailwind = 4; msg("${if (m.side == 0) "" else "상대 "}바람이 등 뒤에서 불기 시작했다!") }
+            }
+            "PREVENT_STATUS" -> { val s = sideOf(m); if (s.safeguard > 0) msg("하지만 실패했다!") else { s.safeguard = 5; msg("${if (m.side == 0) "" else "상대 "}팀이 세이프가드에 둘러싸였다!") } }
+            "PREVENT_STAT_REDUCTION" -> { val s = sideOf(m); if (s.mist > 0) msg("하지만 실패했다!") else { s.mist = 5; msg("${if (m.side == 0) "" else "상대 "}팀이 흰안개에 둘러싸였다!") } }
+            "HEAL_STATUS", "CURE_PARTY_STATUS" -> {
+                if (m.status != Status.NONE) { m.status = Status.NONE; emit(BattleEvent.StatusChanged(m.side)); msg("${nm(m)}의 상태 이상이 나았다!") }
+                else msg("하지만 실패했다!")
+            }
+            "HEAL_IN_3_TURNS" -> { m.wishTurns = 2; m.wishHp = m.maxHp / 2; msg("${nm(m)}은 소원을 빌었다!") }
+            "HEAL_PULSE" -> msg("하지만 실패했다!")
+            "FAINT_AND_FULL_HEAL_NEXT_MON" -> {
+                if (sideOf(m).switchTargets().isEmpty()) { msg("하지만 실패했다!"); return }
+                sideOf(m).healingWish = true
+                damage(m, m.hp); faint(m)
+            }
+            "GRAVITY" -> if (gravityTurns > 0) msg("하지만 실패했다!") else { gravityTurns = 5; msg("중력이 강해졌다!") }
+            "WONDER_ROOM", "HALVE_FIRE_DAMAGE", "APPLY_MAGIC_COAT", "STEAL_STATUS_MOVE", "MAKE_GLOBAL_TARGET",
+            "ALLY_SWITCH", "BOOST_ALLY_POWER_BY_50_PERCENT", "QUICK_GUARD", "WIDE_GUARD", "USE_RANDOM_ALLY_MOVE",
+            "NEXT_ATTACK_ALWAYS_HITS", "DEF_UP_DOUBLE_ROLLOUT_POWER_" -> msg("하지만 실패했다!")
+            "CALL_RANDOM_MOVE" -> {
+                val mv = data.moves.values.filter { it.power > 0 && !it.isStatus && it.effect !in setOf("ONE_HIT_KO") }.random()
+                recordMove(m, mv)
+                executeMove(m, mv, false, calledMove = true)
+            }
+            "CONFUSE_ALL" -> { tryConfuse(foe(m), m, silentFail = false) }
             "EVA_UP_2_MINIMIZE" -> { m.minimized = true; changeStage(m, Stat.EVA, 2, m, failMsg = true) }
             "SP_DEF_UP_DOUBLE_ELECTRIC_POWER" -> {
                 m.charged = true; m.chargeTurnsLeft = 2
@@ -1574,8 +1714,11 @@ class Battle(
         if (stat < 1 || t.fainted) return
         val name = Stat.NAMES_KO[stat]
         if (amount < 0 && source !== t) {
+            if (sideOf(t).mist > 0) { if (failMsg) msg("${nm(t)}은 흰안개로 보호받고 있다!"); return }
             val a = if (source != null) defAbility(source, t) else ability(t)
-            if (a == Ab.CLEAR_BODY || (a == Ab.HYPER_CUTTER && stat == Stat.ATK) || (a == Ab.KEEN_EYE && stat == Stat.ACC)) {
+            if (a == Ab.CLEAR_BODY || (a == Ab.HYPER_CUTTER && stat == Stat.ATK) ||
+                ((a == Ab.KEEN_EYE || a == Ab.ILLUMINATE) && stat == Stat.ACC) || (a == Ab.BIG_PECKS && stat == Stat.DEF)
+            ) {
                 if (failMsg || fromAbility) msg("${nm(t)}의 ${abName(a)}로 ${Josa.iGa(name)} 떨어지지 않는다!")
                 return
             }
@@ -1615,6 +1758,10 @@ class Battle(
         if (t.status != Status.NONE) {
             if (!silentFail) msg(if (t.status == s || (s == Status.POISON && t.status == Status.TOXIC) || (s == Status.TOXIC && t.status == Status.POISON))
                 "${Josa.eunNeun(nm(t))} 이미 ${statusNoun(t.status)} 상태다!" else "하지만 실패했다!")
+            return false
+        }
+        if (source != null && source !== t && sideOf(t).safeguard > 0) {
+            if (!silentFail) msg("${nm(t)}은 세이프가드에 보호받고 있다!")
             return false
         }
         val a = if (source != null && source !== t) defAbility(source, t) else ability(t)
@@ -1812,12 +1959,12 @@ class Battle(
                     if (m.fainted) continue
                     val a = ability(m)
                     when (w) {
-                        Weather.SAND -> if (!(m.hasType(Types.ROCK) || m.hasType(Types.GROUND) || m.hasType(Types.STEEL) || a == Ab.SAND_VEIL) && m.semiInvulnerable !in setOf("DIG", "DIVE")) {
+                        Weather.SAND -> if (!(m.hasType(Types.ROCK) || m.hasType(Types.GROUND) || m.hasType(Types.STEEL) || a in setOf(Ab.SAND_VEIL, Ab.SAND_RUSH, Ab.SAND_FORCE, Ab.MAGIC_GUARD, Ab.OVERCOAT)) && m.semiInvulnerable !in setOf("DIG", "DIVE")) {
                             msg("모래바람이 ${Josa.eulReul(nm(m))} 덮쳤다!"); damage(m, maxOf(1, m.maxHp / 16))
                         }
                         Weather.HAIL -> if (a == Ab.ICE_BODY) {
                             if (m.hp < m.maxHp) { heal(m, maxOf(1, m.maxHp / 16)); msg("${nm(m)}의 ${abName(a)}로 체력이 회복되었다!") }
-                        } else if (!m.hasType(Types.ICE) && a != Ab.SNOW_CLOAK && m.semiInvulnerable !in setOf("DIG", "DIVE")) {
+                        } else if (!m.hasType(Types.ICE) && a !in setOf(Ab.SNOW_CLOAK, Ab.MAGIC_GUARD, Ab.ICE_BODY, Ab.OVERCOAT) && m.semiInvulnerable !in setOf("DIG", "DIVE")) {
                             msg("싸라기눈이 ${Josa.eulReul(nm(m))} 덮쳤다!"); damage(m, maxOf(1, m.maxHp / 16))
                         }
                         Weather.RAIN -> when (a) {
@@ -1854,6 +2001,16 @@ class Battle(
             if (m.fainted) continue
             val a = ability(m)
             val it = item(m)
+            // Wish resolves on its own mon
+            if (m.wishTurns > 0 && --m.wishTurns == 0 && m.hp < m.maxHp) {
+                heal(m, m.wishHp); msg("${nm(m)}의 소원이 이루어졌다!")
+            }
+            if (m.healBlockTurns > 0) m.healBlockTurns--
+            if (m.embargoTurns > 0) m.embargoTurns--
+            // Shed Skin: 30% to cure status
+            if (a == Ab.SHED_SKIN && m.status != Status.NONE && rng.chance(30)) {
+                m.status = Status.NONE; emit(BattleEvent.StatusChanged(m.side)); msg("${nm(m)}의 탈피로 상태 이상이 나았다!")
+            }
             // Aqua Ring, Ingrain
             if (m.aquaRing && m.hp < m.maxHp) {
                 heal(m, maxOf(1, m.maxHp / 16 * (if (it == It.BIG_ROOT) 13 else 10) / 10)); msg("${Josa.eunNeun(nm(m))} 물의 베일로 체력을 회복했다!")
@@ -1868,8 +2025,9 @@ class Battle(
                 else { msg("${Josa.eunNeun(nm(m))} 검은오물로 데미지를 입었다!"); damage(m, maxOf(1, m.maxHp / 8)) }
             }
             if (m.fainted) { faint(m); continue }
+            val magicGuard = a == Ab.MAGIC_GUARD
             // Leech Seed
-            if (m.leechSeeded) {
+            if (m.leechSeeded && !magicGuard) {
                 val f = foe(m)
                 val d = minOf(m.hp, maxOf(1, m.maxHp / 8))
                 msg("씨뿌리기가 ${nm(m)}의 체력을 빼앗는다!")
@@ -1882,7 +2040,7 @@ class Battle(
                 if (m.fainted) { faint(m); continue }
             }
             // poison / burn
-            when (m.status) {
+            when (if (magicGuard && a != Ab.POISON_HEAL) Status.NONE else m.status) {
                 Status.POISON, Status.TOXIC -> {
                     if (m.status == Status.TOXIC) m.toxicCounter++
                     if (a == Ab.POISON_HEAL) {
@@ -1902,14 +2060,15 @@ class Battle(
             }
             if (m.fainted) { faint(m); continue }
             if (m.nightmare && m.status == Status.SLEEP) {
-                msg("${Josa.eunNeun(nm(m))} 악몽에 시달리고 있다!"); damage(m, maxOf(1, m.maxHp / 4))
+                if (!magicGuard) { msg("${Josa.eunNeun(nm(m))} 악몽에 시달리고 있다!"); damage(m, maxOf(1, m.maxHp / 4)) }
                 if (m.fainted) { faint(m); continue }
             } else m.nightmare = false
-            if (m.cursed) {
+            if (m.cursed && !magicGuard) {
                 msg("${Josa.eunNeun(nm(m))} 저주받고 있다!"); damage(m, maxOf(1, m.maxHp / 4))
                 if (m.fainted) { faint(m); continue }
             }
             if (m.bindTurns > 0) {
+                if (magicGuard) { m.bindTurns = 0 }
                 m.bindTurns--
                 if (m.bindTurns == 0) msg("${Josa.eunNeun(nm(m))} ${mvName(m.bindMove!!)}에서 풀려났다!")
                 else {
@@ -1939,8 +2098,12 @@ class Battle(
         for (s in sides) {
             if (s.reflect > 0 && --s.reflect == 0) msg(if (s.index == 0) "리플렉터의 효과가 사라졌다!" else "상대의 리플렉터의 효과가 사라졌다!")
             if (s.lightScreen > 0 && --s.lightScreen == 0) msg(if (s.index == 0) "빛의장막의 효과가 사라졌다!" else "상대의 빛의장막의 효과가 사라졌다!")
+            if (s.tailwind > 0 && --s.tailwind == 0) msg(if (s.index == 0) "등 뒤의 바람이 멈췄다!" else "상대의 등 뒤의 바람이 멈췄다!")
+            if (s.safeguard > 0 && --s.safeguard == 0) msg(if (s.index == 0) "세이프가드의 효과가 사라졌다!" else "상대의 세이프가드의 효과가 사라졌다!")
+            if (s.mist > 0 && --s.mist == 0) msg(if (s.index == 0) "흰안개가 사라졌다!" else "상대의 흰안개가 사라졌다!")
         }
         if (trickRoom > 0 && --trickRoom == 0) msg("뒤틀린 시공이 원래대로 되돌아왔다!")
+        if (gravityTurns > 0 && --gravityTurns == 0) msg("중력이 원래대로 되돌아왔다!")
         for (s in sides) {
             val m = s.mon
             if (!m.fainted) m.turnsOnField++

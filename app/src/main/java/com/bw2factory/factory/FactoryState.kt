@@ -62,11 +62,14 @@ class Factory(private val data: GameData) {
      * New rentals and trainers for the round. The first opponent is generated now, avoiding the species and
      * items of all six rentals (the original avoids the chosen three; it rolls the opponent after the pick).
      */
+    private fun opp(r: LcRandom, trainerId: Int, avoid: List<FactoryMon>) =
+        FactoryRules.opponents(data, r, trainerId, data.trainers[trainerId].sets, avoid)
+
     private fun startRound(s: FactoryState): FactoryState = s.withRng { r ->
         val rentals = FactoryRules.rentals(data, r, s.round, s.trades)
         val trainers = FactoryRules.pickRoundTrainers(r, s.round)
         val n = s.copy(phase = Phase.RENTAL, rentals = rentals, roundTrainers = trainers, party = emptyList(), swapOffer = emptyList())
-        n.copy(opponent = FactoryRules.opponents(data, r, n.trainerId, rentals))
+        n.copy(opponent = opp(r, n.trainerId, rentals))
     }
 
     /** picks: indices into rentals, in party order (first is the lead). */
@@ -78,7 +81,7 @@ class Factory(private val data: GameData) {
 
     /** Rolls the next opponent, avoiding the given Pokémon (the party plus anything the player may still take). */
     private fun rollOpponent(s: FactoryState, avoid: List<FactoryMon>): FactoryState = s.withRng { r ->
-        s.copy(opponent = FactoryRules.opponents(data, r, s.trainerId, avoid))
+        s.copy(opponent = opp(r, s.trainerId, avoid))
     }
 
     /** Brings saves from v1.0 (opponent rolled at battle prep, offer kept in `opponent`) to this flow. */

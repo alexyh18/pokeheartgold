@@ -94,10 +94,13 @@ data class FactorySet(
 data class TrainerData(
     val id: Int,
     val trainerClass: Int,
+    val classKey: String = "",
     val className: String,
+    val classKo: String = "",
     val name: String,
     val sprite: Int = 0,
-    val classKo: String = "",
+    /** set ids (into GameData.sets) this trainer may use */
+    val sets: List<Int> = emptyList(),
 )
 
 class GameData(

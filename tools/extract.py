@@ -29,9 +29,76 @@ BW = os.path.join(WS, "pokebw2")
 CACHE = os.path.join(ROOT, "tools", "cache")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets")
 
-SET_MIN, SET_MAX = 351, 950
-MAX_SPECIES = 493
+SUBWAY = os.path.join(BW, "data", "facilities", "battle_subway")
 KO = "3"
+
+# Moves not on any set but needed by the engine.
+EXTRA_MOVES = {"MOVE_STRUGGLE"}
+
+# Battle Subway trainer class -> (Korean name, BW-trainer sprite cell). The sprite cells are the BW "Trainers"
+# sheet cells cut by trainer_sprites.py; Subway classes are mapped to the closest-looking BW trainer. The two
+# Subway Bosses (Ingo/Emmet) have no BW sprite, so they reuse the Veteran cell (81) as a stand-in.
+CLASS_INFO = {
+    "TRAINER_CLASS_YOUNGSTER": ("반바지 꼬마", 2),
+    "TRAINER_CLASS_LASS": ("짧은 치마", 3),
+    "TRAINER_CLASS_SCHOOL_KID_M": ("학원생", 4),
+    "TRAINER_CLASS_SCHOOL_KID_F": ("학원생", 5),
+    "TRAINER_CLASS_RICH_BOY": ("도련님", 47),
+    "TRAINER_CLASS_LADY": ("아가씨", 48),
+    "TRAINER_CLASS_PRESCHOOLER_M": ("유치원생", 15),
+    "TRAINER_CLASS_PRESCHOOLER_F": ("유치원생", 15),
+    "TRAINER_CLASS_BACKPACKER_M": ("백팩커", 79),
+    "TRAINER_CLASS_BACKPACKER_F": ("백팩커", 70),
+    "TRAINER_CLASS_ACE_TRAINER_M": ("엘리트 트레이너", 99),
+    "TRAINER_CLASS_ACE_TRAINER_F": ("엘리트 트레이너", 100),
+    "TRAINER_CLASS_VETERAN_M": ("베테랑", 81),
+    "TRAINER_CLASS_VETERAN_F": ("베테랑", 76),
+    "TRAINER_CLASS_BATTLE_GIRL": ("배틀걸", 69),
+    "TRAINER_CLASS_BLACK_BELT": ("태권왕", 56),
+    "TRAINER_CLASS_PSYCHIC_M": ("초능력자", 35),
+    "TRAINER_CLASS_PSYCHIC_F": ("초능력자", 36),
+    "TRAINER_CLASS_PKMN_RANGER_M": ("포켓몬레인저", 24),
+    "TRAINER_CLASS_PKMN_RANGER_F": ("포켓몬레인저", 25),
+    "TRAINER_CLASS_SCIENTIST_M_52": ("연구원", 57),
+    "TRAINER_CLASS_SCIENTIST_F_46": ("연구원", 57),
+    "TRAINER_CLASS_PKMN_BREEDER_M": ("포켓몬브리더", 47),
+    "TRAINER_CLASS_PKMN_BREEDER_F": ("포켓몬브리더", 13),
+    "TRAINER_CLASS_POKEFAN_M": ("애호가클럽", 64),
+    "TRAINER_CLASS_POKEFAN_F": ("애호가클럽", 65),
+    "TRAINER_CLASS_ARTIST": ("화가", 33),
+    "TRAINER_CLASS_BAKER": ("제빵사", 9),
+    "TRAINER_CLASS_BIKER": ("폭주족", 77),
+    "TRAINER_CLASS_ROUGHNECK": ("스킨헤드", 77),
+    "TRAINER_CLASS_CLERK_F": ("회사원", 9),
+    "TRAINER_CLASS_CLERK_M_66": ("회사원", 8),
+    "TRAINER_CLASS_CLERK_M_67": ("회사원", 8),
+    "TRAINER_CLASS_CYCLIST_F": ("사이클링", 96),
+    "TRAINER_CLASS_CYCLIST_M": ("사이클링", 95),
+    "TRAINER_CLASS_DEPOT_AGENT": ("역무원", 8),
+    "TRAINER_CLASS_DOCTOR": ("의사", 57),
+    "TRAINER_CLASS_NURSE": ("간호사", 9),
+    "TRAINER_CLASS_FISHERMAN": ("낚시꾼", 29),
+    "TRAINER_CLASS_GENTLEMAN": ("신사", 72),
+    "TRAINER_CLASS_HARLEQUIN_32": ("피에로", 32),
+    "TRAINER_CLASS_HIKER": ("등산가", 79),
+    "TRAINER_CLASS_JANITOR": ("관리인", 59),
+    "TRAINER_CLASS_MAID": ("메이드", 76),
+    "TRAINER_CLASS_NURSERY_AIDE": ("보육교사", 76),
+    "TRAINER_CLASS_PARASOL_LADY": ("파라솔아가씨", 70),
+    "TRAINER_CLASS_PILOT": ("파일럿", 88),
+    "TRAINER_CLASS_POLICEMAN": ("경찰관", 91),
+    "TRAINER_CLASS_SOCIALITE": ("상류층", 48),
+    "TRAINER_CLASS_WAITER": ("웨이터", 8),
+    "TRAINER_CLASS_WAITRESS": ("웨이트리스", 9),
+    "TRAINER_CLASS_WORKER_26": ("작업원", 17),
+    "TRAINER_CLASS_WORKER_44": ("작업원", 17),
+    "TRAINER_CLASS_PKMN_TRAINER_NATE": ("포켓몬트레이너", 0),
+    "TRAINER_CLASS_PKMN_TRAINER_ROSA": ("포켓몬트레이너", 1),
+    "TRAINER_CLASS_SUBWAY_BOSS_88": ("배틀서브웨이 보스", 81),
+    "TRAINER_CLASS_SUBWAY_BOSS_102": ("배틀서브웨이 보스", 81),
+}
+TRAINER_CLASS_NAMES = {}  # filled from trainer_classes/*.json
+CLASS_ID = {}  # assigned in order of appearance
 # BW2 stat-change targets -> engine stage names (8 = every stat, used by Ancient Power and friends)
 STAT_KEYS = {
     "BATTLEMON_ATTACK_STAGE": "ATK", "BATTLEMON_DEFENSE_STAGE": "DEF", "BATTLEMON_SPEED_STAGE": "SPE",
@@ -55,15 +122,6 @@ def narc(path):
     return [b[d + s:d + e] for s, e in fat]
 
 
-def hg_consts(name, prefix):
-    out = {}
-    for line in open(os.path.join(HG, "include", "constants", name)):
-        m = re.match(r"#define\s+(" + prefix + r"\w+)\s+(\d+)\s*$", line)
-        if m and int(m.group(2)) not in out:
-            out[int(m.group(2))] = m.group(1)
-    return out
-
-
 def bw_consts(name):
     """BW2 constant lists: 'NAME = n' sets the counter, otherwise +1."""
     out, n = {}, -1
@@ -79,11 +137,6 @@ def bw_consts(name):
             n += 1
         out[k] = n
     return out
-
-
-def msg(bank):
-    d = json.load(open(os.path.join(HG, "files", "msgdata", "msg", bank + ".json"), encoding="utf-8"))
-    return [m.get("en_US", "") for m in d["messages"]]
 
 
 def csv_rows(name):
@@ -126,49 +179,56 @@ def write(rel, obj):
 
 
 def main():
-    hg_species = hg_consts("species.h", "SPECIES_")
-    hg_moves = hg_consts("moves.h", "MOVE_")
-    hg_items = hg_consts("items.h", "ITEM_")
+    bw_species = bw_consts("species.txt")  # SPECIES_* -> national dex no.
     bw_moves = bw_consts("moves.txt")
     bw_items = bw_consts("items.txt")
-    bw_items_by_id = {v: k for k, v in bw_items.items()}
     bw_abil = bw_consts("abilities.txt")
     bw_nat = bw_consts("natures.txt")
     bw_types = bw_consts("types.txt")
 
-    raw_sets = narc(os.path.join(HG, "files", "a", "2", "0", "3"))
-    raw_trainers = narc(os.path.join(HG, "files", "a", "2", "0", "2"))
+    for key in CLASS_INFO:
+        d = const_to_dir(key, "TRAINER_CLASS_").rstrip("0123456789_")
+        p = os.path.join(BW, "data", "trainer_classes", const_to_dir(key, "TRAINER_CLASS_") + ".json")
+        if os.path.exists(p):
+            TRAINER_CLASS_NAMES[key] = json.load(open(p, encoding="utf-8"))["name"]
 
-    # ---- sets
+    order = json.load(open(os.path.join(SUBWAY, "order.json"), encoding="utf-8"))
+    # The battle code addresses sets and trainers by their arc file index, which is the order.json position.
+    set_index = {name: i for i, name in enumerate(order["pokemon"])}
+
+    # ---- sets (Battle Subway: 1000 named sets, in order.json order)
     sets, used_species, used_moves, used_items = {}, set(), set(), set()
-    for i in range(SET_MIN, SET_MAX + 1):
-        sp, m1, m2, m3, m4, evs, nature, item, form = struct.unpack("<H4HBBHH", raw_sets[i])
-        if sp > MAX_SPECIES:
+    for name, i in set_index.items():
+        j = json.load(open(os.path.join(SUBWAY, "pokemon", name + ".json"), encoding="utf-8"))
+        if j["species"] == "SPECIES_NONE":
+            # Keep an index placeholder so later indices still line up, but mark it empty.
+            sets[i] = {"id": i, "species": 0, "moves": [], "evs": [False] * 6, "nature": 0, "item": 0, "form": 0}
             continue
+        sp = bw_species[j["species"]]
         moves = []
-        for m in (m1, m2, m3, m4):
-            if m:
-                c = hg_moves[m]
-                assert c in bw_moves, c
-                moves.append(bw_moves[c])
-                used_moves.add(c)
-        # Gen 4 hold-item ids are kept unchanged in Gen 5 (only spellings differ), so map by id.
-        icon = bw_items_by_id[item] if item else "ITEM_NONE"
+        for m in j["moves"]:
+            if m != "MOVE_NONE":
+                moves.append(bw_moves[m])
+                used_moves.add(m)
+        ev = j["ev_flags"]
+        item = bw_items[j["item"]]
         if item:
-            used_items.add(icon)
+            used_items.add(j["item"])
         sets[i] = {
             "id": i, "species": sp, "moves": moves,
-            "evs": [bool(evs & (1 << s)) for s in range(6)],  # HP, Atk, Def, Spe, SpA, SpD
-            "nature": nature, "item": bw_items[icon] if item else 0, "form": form,
+            # HP, Atk, Def, Spe, SpA, SpD (BSubwayPokemonData.evFlags bit order)
+            "evs": [ev["hp"], ev["attack"], ev["defense"], ev["speed"], ev["special_attack"], ev["special_defense"]],
+            "nature": bw_nat[j["nature"]], "item": item, "form": j["form"],
         }
-        used_species.add(sp)
+        used_species.add(j["species"])
 
-    # ---- species (export every Gen 4 species that appears)
+    # ---- species (every species a subway set uses)
     ko_sp = ko_names("pokemon_species_names", "pokemon_species_id")
     species_out, used_abilities = [], set()
     sprite_dirs = {"front": "front_single.png", "back": "back_single.png", "icon": "icon.png"}
-    for sp in sorted(used_species):
-        d = const_to_dir(hg_species[sp], "SPECIES_")
+    for key in sorted(used_species, key=lambda s: bw_species[s]):
+        sp = bw_species[key]
+        d = const_to_dir(key, "SPECIES_")
         p = os.path.join(BW, "data", "pokemon", d, "data.json")
         j = json.load(open(p, encoding="utf-8"))
         bs = j["base_stats"]
@@ -195,7 +255,7 @@ def main():
     ko_mv = ko_names("move_names", "move_id")
     ko_mv_desc = ko_flavor("move_flavor_text", "move_id")
     moves_out = []
-    for c in sorted(used_moves, key=lambda c: bw_moves[c]):
+    for c in sorted({m for m in used_moves} | EXTRA_MOVES, key=lambda c: bw_moves[c]):
         d = const_to_dir(c, "MOVE_")
         j = json.load(open(os.path.join(BW, "data", "moves", d, "data.json"), encoding="utf-8"))
         pid = move_ids.get(d.replace("_", "-"), str(bw_moves[c]))
@@ -231,7 +291,8 @@ def main():
             "id": bw_items[c], "key": d, "name": j["name"],
             "nameKo": ko_it.get(pid, j["name"]) if pid else j["name"],
             "desc": (ko_it_desc.get(pid) if pid else None) or j["description"].replace("\n", " "),
-            "holdEffect": strip_prefix(j["hold_effect"], "HOLD_EFFECT_"), "holdParam": j["hold_param"],
+            # hold_effect is usually HOLD_EFFECT_*, but gems/Rocky Helmet/Air Balloon etc. use the numeric id 147.
+            "holdEffect": str(strip_prefix(j["hold_effect"], "HOLD_EFFECT_")), "holdParam": j["hold_param"],
             "flingPower": j["fling_power"],
         })
 
@@ -264,13 +325,19 @@ def main():
             continue
         types_out.append({"id": n, "key": const_to_dir(c, "TYPE_"), "nameKo": ko_ty.get(str(n + 1), c)})
 
-    # ---- trainers
-    names = msg("msg_0027")
-    classes = msg("msg_0730")
+    # ---- trainers (Battle Subway, in order.json order)
     trainers_out = []
-    for i, t in enumerate(raw_trainers):
-        v = struct.unpack("<%dH" % (len(t) // 2), t)
-        trainers_out.append({"id": i, "trainerClass": v[0], "className": classes[v[0]], "name": names[i]})
+    for i, name in enumerate(order["trainers"]):
+        j = json.load(open(os.path.join(SUBWAY, "trainers", name + ".json"), encoding="utf-8"))
+        cls = j["class"]
+        ko, sprite = CLASS_INFO.get(cls, ("트레이너", 0))
+        # The game draws one of the trainer's listed sets per slot; store their indices.
+        set_ids = [set_index[s] for s in j["pokemon"]]
+        trainers_out.append({
+            "id": i, "trainerClass": CLASS_ID.setdefault(cls, len(CLASS_ID)),
+            "classKey": cls, "className": TRAINER_CLASS_NAMES.get(cls, cls), "classKo": ko,
+            "name": j.get("name", "?"), "sprite": sprite, "sets": set_ids,
+        })
 
     write("data/sets.json", list(sets.values()))
     write("data/species.json", species_out)
