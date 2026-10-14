@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.0.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.1.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,13 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.1 변경점
+
+- **연승 포기**: 화면 상단 "포기" 버튼으로 현재 연승을 접고 1번째 열차부터 다시 시작(최고 기록은 유지)
+- **배틀 중 포켓몬 요약**: 배틀의 포켓몬 창에서 각 포켓몬을 탭하면 능력치(랭크 변화 화살표 포함)와 기술 배치(타입·분류·위력·명중·PP) 확인
+- **최종진화체만 등장**: 진화가 남은 포켓몬(폴리곤2, 두까비 등 75종)은 렌탈·상대에 나오지 않음
+- **배틀 UI를 BW2 스타일로**: 비스듬한 HP 상태창·HP바·상태이상 아이콘·상대 파티 표시를 BW2 모양으로 다시 그림(코드로 직접 그린 오리지널 UI)
 
 ## v2.0 변경점
 

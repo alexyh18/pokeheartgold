@@ -223,6 +223,13 @@ def main():
         used_species.add(j["species"])
 
     # ---- species (every species a subway set uses)
+    # A species is "final" (fully evolved) when it has no further evolutions.
+    final_evo = {}
+    for key in bw_species:
+        d = const_to_dir(key, "SPECIES_")
+        p = os.path.join(BW, "data", "pokemon", d, "data.json")
+        if os.path.exists(p):
+            final_evo[bw_species[key]] = not json.load(open(p, encoding="utf-8")).get("evolutions")
     ko_sp = ko_names("pokemon_species_names", "pokemon_species_id")
     species_out, used_abilities = [], set()
     sprite_dirs = {"front": "front_single.png", "back": "back_single.png", "icon": "icon.png"}
@@ -243,6 +250,7 @@ def main():
             "weight": j["weight"],
             "genderRatio": {"GENDER_RATIO_MALE_ONLY": 0, "GENDER_RATIO_FEMALE_ONLY": 254,
                             "GENDER_RATIO_GENDERLESS": 255}.get(j["gender_ratio"], j["gender_ratio"]),
+            "final": final_evo.get(sp, True),
         })
         for kind, fname in sprite_dirs.items():
             src = os.path.join(BW, "data", "pokemon", d, fname)

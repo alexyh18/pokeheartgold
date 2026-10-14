@@ -77,11 +77,16 @@ object FactoryRules {
         excludeSpecies: List<Int>,
         excludeItems: List<Int>,
     ): List<Int> {
+        // Only fully-evolved Pokémon appear. If this trainer's list can't field [count] of them,
+        // fall back to the global final-evolution pool so the team can still be filled.
+        var pool = trainerSets.filter { data.isFinalEvo(it) }
+        if (pool.distinctBy { data.sets.getValue(it).species }.size < count) pool = data.finalEvoSetIds
+        if (pool.isEmpty()) return emptyList()
         val picks = mutableListOf<Int>()
         var retries = 0
         var guard = 0
         while (picks.size < count && guard++ < 10000) {
-            val id = trainerSets[rng.next() % trainerSets.size]
+            val id = pool[rng.next() % pool.size]
             val set = data.sets[id] ?: continue
             if (set.species == 0) continue
             if (picks.any { data.sets.getValue(it).species == set.species }) continue
@@ -107,8 +112,7 @@ object FactoryRules {
         // Rentals use the same tier as the opponents of this train (the first car's trainer range + IV).
         val sampleTrainer = pickTrainer(LcRandom(rng.seed), round, 0)
         val iv = ivForTrainer(sampleTrainer)
-        val pool = (0 until 1000).filter { data.sets[it]?.species?.let { s -> s != 0 } == true }
-        val picks = pickSets(data, rng, pool, 6, emptyList(), emptyList())
+        val picks = pickSets(data, rng, data.finalEvoSetIds, 6, emptyList(), emptyList())
         return picks.map { buildMon(rng, it, iv) }
     }
 

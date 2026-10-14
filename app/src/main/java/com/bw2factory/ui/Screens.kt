@@ -1,6 +1,7 @@
 package com.bw2factory.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -36,8 +37,9 @@ fun FactoryApp(vm: GameViewModel) {
         if (session != null) {
             BattleScreen(vm, session)
         } else {
+            var confirmForfeit by remember { mutableStateOf(false) }
             Column(Modifier.fillMaxSize()) {
-                Header(vm)
+                Header(vm) { confirmForfeit = true }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (vm.state.phase) {
                         Phase.RENTAL -> RentalScreen(vm)
@@ -48,13 +50,25 @@ fun FactoryApp(vm: GameViewModel) {
                     }
                 }
             }
+            if (confirmForfeit) {
+                val s = vm.state
+                ConfirmDialog(
+                    title = "연승을 포기할까요?",
+                    body = "현재 ${s.streak}연승을 포기하고 처음(1번째 열차)부터 다시 시작합니다.\n최고 기록은 그대로 남습니다.",
+                    confirm = "포기하고 처음부터",
+                    onConfirm = { confirmForfeit = false; vm.forfeit() },
+                    onCancel = { confirmForfeit = false },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun Header(vm: GameViewModel) {
+private fun Header(vm: GameViewModel, onForfeit: () -> Unit) {
     val s = vm.state
+    // Forfeit is available whenever a run is in progress (not already lost, and past the very first choice).
+    val canForfeit = s.phase != Phase.LOST && (s.streak > 0 || s.phase != Phase.RENTAL)
     Row(
         Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -70,6 +84,30 @@ private fun Header(vm: GameViewModel) {
         Column(horizontalAlignment = Alignment.End) {
             Text("연승 ${s.streak}", color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Text("최고 ${s.bestStreak} · 교환 ${s.trades}", color = Bw.textDim, fontSize = 11.sp)
+        }
+        if (canForfeit) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF503038))
+                    .border(1.dp, Bw.accent, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onForfeit).padding(horizontal = 8.dp, vertical = 6.dp),
+            ) { Text("포기", color = Bw.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmDialog(title: String, body: String, confirm: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(enabled = false) {}, contentAlignment = Alignment.Center) {
+        BwPanel(Modifier.fillMaxWidth(0.85f)) {
+            Text(title, color = Bw.gold, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(body, color = Bw.text, fontSize = 14.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BwButton("취소", Modifier.weight(1f), color = Color(0xFF4878B8), onClick = onCancel)
+                BwButton(confirm, Modifier.weight(1f), onClick = onConfirm)
+            }
         }
     }
 }

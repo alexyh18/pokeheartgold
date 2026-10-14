@@ -16,6 +16,8 @@ data class SpeciesData(
     /** in 0.1 kg */
     val weight: Int,
     val genderRatio: Int,
+    /** true if this species cannot evolve further (fully evolved, or a single-stage species) */
+    val final: Boolean = true,
 )
 
 @Serializable
@@ -119,6 +121,14 @@ class GameData(
     val items = items.associateBy { it.id }
     val abilities = abilities.associateBy { it.id }
     val sets = sets.associateBy { it.id }
+
+    /** Set ids whose species is fully evolved (used for the "final evolutions only" pools). */
+    val finalEvoSetIds: List<Int> = sets.filter { it.species != 0 && species.first { s -> s.id == it.species }.final }.map { it.id }
+
+    fun isFinalEvo(setId: Int): Boolean {
+        val sp = sets[setId]?.species ?: return false
+        return sp != 0 && (this.species[sp]?.final ?: false)
+    }
 
     fun move(id: Int) = moves.getValue(id)
     fun move(key: String) = movesByKey.getValue(key)

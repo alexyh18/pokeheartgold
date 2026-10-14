@@ -76,6 +76,9 @@ class GameViewModel(val data: GameData, val sprites: Sprites, private val store:
     fun nextRound() = update(factory.continueAfterRound(state))
     fun newChallenge() = update(factory.newChallenge(state))
 
+    /** Give up the current streak and start over from train 1. The best-streak record is kept. */
+    fun forfeit() = update(factory.newChallenge(state))
+
     fun startBattle() {
         if (session != null) return
         val s = state
