@@ -110,31 +110,35 @@ fun BwButton(text: String, modifier: Modifier = Modifier, color: Color = Bw.acce
     val shape = RoundedCornerShape(18.dp)
     val top = if (enabled) color.lighten(0.18f) else Color(0xFF586068)
     val bottom = if (enabled) color.darken(0.30f) else Color(0xFF3C444C)
-    // The outer Box must size to its content so the button stays visible even when the caller
-    // supplies no explicit height. The Text (plus its padding) drives the measured height; the
-    // decorative ledge/sheen layers use matchParentSize() so they never affect that measurement.
+    // The outer Box sizes to its content so the button stays visible even when the caller supplies
+    // no explicit height. An invisible "sizer" Text drives the measured height; the decorative
+    // layers and the clickable face use matchParentSize() so the WHOLE button is tappable
+    // (not just the glyphs).
     Box(modifier, contentAlignment = Alignment.Center) {
         // ledge / drop shadow
         Box(
             Modifier.matchParentSize().padding(top = 4.dp).clip(shape)
                 .background(if (enabled) color.darken(0.55f) else Color(0xFF2A3038)),
         )
-        // top sheen
-        Box(Modifier.matchParentSize().padding(bottom = 4.dp, start = 10.dp, end = 10.dp, top = 4.dp)) {
-            Box(Modifier.fillMaxWidth().fillMaxHeight(0.42f).clip(RoundedCornerShape(percent = 50)).background(Color(0x26FFFFFF)))
+        // sizer: invisible copy of the label; the only child that contributes to the parent's size
+        Box(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp).padding(bottom = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text, color = Color.Transparent, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center)
         }
-        // face: this layer (via the Text) determines the button's intrinsic height
+        // face: fills the whole button, carries the click, and shows the sheen + label
         Box(
             Modifier.matchParentSize().padding(bottom = 4.dp).clip(shape)
                 .background(Brush.verticalGradient(listOf(top, bottom)))
-                .border(2.dp, Color.White.copy(alpha = if (enabled) 0.75f else 0.25f), shape),
-        )
-        Box(
-            Modifier.clip(shape).clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .padding(bottom = 4.dp),
+                .border(2.dp, Color.White.copy(alpha = if (enabled) 0.75f else 0.25f), shape)
+                .clickable(enabled = enabled, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
+            // top sheen
+            Box(Modifier.matchParentSize().padding(horizontal = 10.dp, vertical = 4.dp)) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(0.42f).clip(RoundedCornerShape(percent = 50)).background(Color(0x26FFFFFF)))
+            }
             Text(text, color = if (enabled) Color.White else Bw.textDim, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center)
         }
     }
