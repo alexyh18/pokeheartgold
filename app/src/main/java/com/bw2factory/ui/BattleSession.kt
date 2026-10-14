@@ -200,6 +200,11 @@ class BattleSession(
                 v.visible = false
             }
             is BattleEvent.UseMove -> {
+                // Announcement only — the attack motion is driven by BattleEvent.Attack, which the
+                // engine emits only once the move has passed every miss/fail check. This keeps the
+                // lunge and projectile from playing when a move whiffs or fails.
+            }
+            is BattleEvent.Attack -> {
                 val v = views[e.side]
                 v.lunge.snapTo(0f)
                 val d = (120 * animScale).toInt().coerceAtLeast(1)

@@ -17,6 +17,8 @@ sealed interface BattleEvent {
     data class StatusChanged(val side: Int) : BattleEvent
     data class Faint(val side: Int) : BattleEvent
     data class UseMove(val side: Int, val move: MoveData) : BattleEvent
+    /** The attack motion actually plays: emitted only once a move has passed all miss/fail checks. */
+    data class Attack(val side: Int, val move: MoveData) : BattleEvent
     /** quarter multiplier: 0, 1, 2, 4, 8, 16 */
     data class Hit(val side: Int, val effectiveness: Int) : BattleEvent
     data class StatAnim(val side: Int, val up: Boolean) : BattleEvent
@@ -755,8 +757,9 @@ class Battle(
         emit(BattleEvent.UseMove(m.side, move))
         if (!secondTurn) recordMove(m, move)
 
-        // ---- self / field moves
+        // ---- self / field moves (these don't "miss", so the motion plays as the move resolves)
         if (move.targetsSelf || move.targetsField || e in setOf("CONVERSION2", "HIT_IN_3_TURNS", "CURSE")) {
+            emit(BattleEvent.Attack(m.side, move))
             selfMove(m, move)
             return
         }
@@ -788,6 +791,7 @@ class Battle(
         if (t.protecting && move.has("PROTECT")) {
             msg("${Josa.eunNeun(nm(t))} 공격으로부터 몸을 지켰다!")
             if (e == "CONTINUE_AND_CONFUSE_SELF") m.lockedMove = null
+            crashRecoil(m, move)
             return
         }
         if (!hitsSemiInvulnerable(m, t, move)) {
@@ -806,6 +810,8 @@ class Battle(
             missed(m, move)
             return
         }
+        // All miss/fail gates passed: now the attack motion actually plays.
+        emit(BattleEvent.Attack(m.side, move))
         if (move.isStatus) {
             statusMove(m, t, move)
         } else {
@@ -815,6 +821,18 @@ class Battle(
 
     private suspend fun missed(m: BattleMon, move: MoveData) {
         if (move.effect == "CONTINUE_AND_CONFUSE_SELF") { m.lockedMove = null; m.lockedTurns = 0 }
+        crashRecoil(m, move)
+    }
+
+    /**
+     * High Jump Kick / Jump Kick crash: if the move whiffs (miss, Protect, or a target it can't affect),
+     * the user takes recoil equal to half its maximum HP. Gen 5 uses max HP, not current HP.
+     */
+    private suspend fun crashRecoil(m: BattleMon, move: MoveData) {
+        if (move.effect != "CRASH_ON_MISS" || m.fainted) return
+        msg("${Josa.eunNeun(nm(m))} 균형을 잃고 땅에 떨어졌다!")
+        damage(m, maxOf(1, m.maxHp / 2))
+        if (m.fainted) faint(m)
     }
 
     private fun hitsSemiInvulnerable(m: BattleMon, t: BattleMon, move: MoveData): Boolean {
@@ -1137,6 +1155,8 @@ class Battle(
         if (eff0 == 0) {
             msg("${nm(t)}에게는 효과가 없는 것 같다…")
             if (e == "CONTINUE_AND_CONFUSE_SELF") m.lockedMove = null
+            // Jump Kick / High Jump Kick crashes when it hits a target it can't affect (e.g. a Ghost).
+            crashRecoil(m, move)
             return
         }
         // Wonder-Guard-like checks aren't needed for the Factory pool.

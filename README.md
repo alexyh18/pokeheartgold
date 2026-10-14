@@ -12,7 +12,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.17.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.18.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -26,6 +26,11 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.18 변경점
+
+- 무릎차기 반동 데미지 구현: 빗나가거나 상대에게 효과가 없거나(고스트 등) 방어에 막히면 사용자가 최대 HP의 절반만큼 반동 데미지를 받음("균형을 잃고 땅에 떨어졌다!")
+- 기술이 빗나가거나 실패할 때는 공격 모션(돌진·기술 이펙트)이 재생되지 않도록 수정. 모든 명중·실패 판정을 통과한 뒤에만 모션이 나감(명중했거나, 변화기/자신 대상 기술이 발동할 때)
 
 ## v2.17 변경점
 
