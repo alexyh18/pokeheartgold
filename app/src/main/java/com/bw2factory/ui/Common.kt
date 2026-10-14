@@ -85,35 +85,56 @@ fun TypeBadge(data: GameData, type: Int) {
     }
 }
 
+/** BW-style menu window: rounded dark-navy panel with a bright double border and a subtle inner sheen. */
 @Composable
 fun BwPanel(modifier: Modifier = Modifier, selected: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     Column(
         modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF3A4856), Bw.bgPanel)))
-            .border(if (selected) 3.dp else 1.dp, if (selected) Bw.gold else Bw.panelLine, RoundedCornerShape(10.dp))
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF3E4E60), Color(0xFF26323E))))
+            .border(if (selected) 3.dp else 2.dp, if (selected) Bw.gold else Color(0xFF8FB0C8), shape)
+            .padding(2.dp)
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
             .padding(8.dp),
         content = content,
     )
 }
 
+/**
+ * BW-style capsule button: fully rounded, a lighter top and darker bottom for a glossy look, a bright rim,
+ * and a dark "ledge" underneath so it reads as a raised key. All drawn in code.
+ */
 @Composable
 fun BwButton(text: String, modifier: Modifier = Modifier, color: Color = Bw.accent, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (enabled) Brush.verticalGradient(listOf(color.copy(alpha = 0.95f), color.copy(red = color.red * 0.7f, green = color.green * 0.7f, blue = color.blue * 0.7f)))
-                else Brush.verticalGradient(listOf(Color(0xFF505860), Color(0xFF404850))),
-            )
-            .border(2.dp, Color.White.copy(alpha = if (enabled) 0.6f else 0.2f), RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, color = if (enabled) Color.White else Bw.textDim, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center)
+    val shape = RoundedCornerShape(18.dp)
+    val top = if (enabled) color.lighten(0.18f) else Color(0xFF586068)
+    val bottom = if (enabled) color.darken(0.30f) else Color(0xFF3C444C)
+    Box(modifier, contentAlignment = Alignment.Center) {
+        // ledge / drop shadow
+        Box(
+            Modifier.matchParentSize().padding(top = 4.dp).clip(shape)
+                .background(if (enabled) color.darken(0.55f) else Color(0xFF2A3038)),
+        )
+        Box(
+            Modifier.matchParentSize().padding(bottom = 4.dp)
+                .clip(shape)
+                .background(Brush.verticalGradient(listOf(top, bottom)))
+                .border(2.dp, Color.White.copy(alpha = if (enabled) 0.75f else 0.25f), shape)
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            // top sheen
+            Box(Modifier.matchParentSize().padding(horizontal = 10.dp, vertical = 4.dp)) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(0.42f).clip(RoundedCornerShape(percent = 50)).background(Color(0x26FFFFFF)))
+            }
+            Text(text, color = if (enabled) Color.White else Bw.textDim, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center)
+        }
     }
 }
+
+private fun Color.lighten(f: Float) = Color(red + (1 - red) * f, green + (1 - green) * f, blue + (1 - blue) * f, alpha)
+private fun Color.darken(f: Float) = Color(red * (1 - f), green * (1 - f), blue * (1 - f), alpha)
 
 @Composable
 fun HpBar(fraction: Float, modifier: Modifier = Modifier) {
