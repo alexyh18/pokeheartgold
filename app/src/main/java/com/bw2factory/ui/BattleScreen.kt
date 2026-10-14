@@ -463,18 +463,19 @@ private fun MessageBox(text: String) {
 @Composable
 private fun CommandMenu(s: BattleSession) {
     val m = s.player.mon
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        BwButton("싸우다", Modifier.fillMaxWidth().weight(1.4f), color = Color(0xFFD83838)) { s.mode = InputMode.FIGHT }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Fixed heights (not weights) so the bottom row always fits even on short command panes.
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BwButton("싸우다", Modifier.fillMaxWidth().weight(1f), color = Color(0xFFD83838)) { s.mode = InputMode.FIGHT }
+        Row(Modifier.fillMaxWidth().height(76.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BwButton("포켓몬", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFF38A848)) { s.mode = InputMode.PARTY }
             BwButton("필드 정보", Modifier.weight(1f).fillMaxHeight(), color = Color(0xFF4878B8)) { s.mode = InputMode.INFO }
         }
         Text(
-            "진행 속도: ${s.speedLabel} (탭하여 변경)",
+            "진행 속도: ${s.speedLabel} (탭하여 변경)" +
+                (if (s.battle.usableSlots(m).isEmpty()) " · 쓸 기술이 없으면 발버둥" else ""),
             color = Bw.textDim, fontSize = 11.sp,
             modifier = Modifier.align(Alignment.End).clickable { s.cycleSpeed() },
         )
-        if (s.battle.usableSlots(m).isEmpty()) Text("쓸 수 있는 기술이 없다! 싸우다를 누르면 발버둥을 쓴다.", color = Bw.accent, fontSize = 11.sp)
     }
 }
 
