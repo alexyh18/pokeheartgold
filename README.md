@@ -3,7 +3,7 @@
 BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이드 게임. 개인 학습/소장용 팬 프로젝트입니다. 배포 금지.
 
 - 앱을 켜면 바로 슈퍼싱글 1번째 열차의 렌탈 선택부터 시작 (저장된 도전이 있으면 이어서)
-- 싱글배틀 · Lv.50 고정, 7연전 = 1열차, 패배 전까지 무한 반복
+- 싱글배틀 · Lv.100 고정, 7연전 = 1열차, 패배 전까지 무한 반복
 - 포켓몬을 고르기 전 다음 상대 정보 공개: 1라운드 3마리 전부, 2라운드 2마리, 3라운드 선두와 기술 1개, 4라운드부터 주 사용 타입
 - 승리 후 상대 포켓몬과 교환, 7열차(49전째) 마지막 칸에 배틀서브웨이 보스(Ingo) 등장
 - 연승·최고 기록·교환 횟수·파티는 매 단계 자동 저장
@@ -11,7 +11,7 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 
 ## 설치
 
-`release/bw2-battle-subway-v2.3.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/bw2-battle-subway-v2.4.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -24,6 +24,10 @@ BW2 배틀서브웨이의 슈퍼싱글을 떼어낸 단독 실행 안드로이�
 | 트레이너 스프라이트 | [The Spriters Resource – Pokémon Black/White "Trainers"](https://www.spriters-resource.com/ds_dsi/pokemonblackwhite/) (가장 비슷한 직업에 매핑, Wayback 경유) |
 | 배틀 배경 | [Pokemon B2W2 Battle Backgrounds by Snivy101 (DeviantArt)](https://www.deviantart.com/snivy101/art/Pokemon-B2W2-Battle-Backgrounds-319706977) |
 | 한국어 기술/도구/특성 이름·설명 | PokeAPI CSV |
+
+## v2.4 변경점
+
+- 포켓몬 레벨을 50 → **100**으로 조정 (노력치·개체값·성격·기술배치·도구는 그대로, 레벨에 따라 능력치만 재계산)
 
 ## v2.3 변경점
 

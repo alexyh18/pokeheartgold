@@ -15,7 +15,9 @@ import com.bw2factory.engine.LcRandom
  */
 object FactoryRules {
     const val BATTLES_PER_ROUND = 7
-    const val LEVEL = 50
+    // Pokémon are generated at level 100. EVs, IVs, nature, moves and items are unchanged — only the level
+    // (and thus the level-scaled stats) differs from the real Super Single's level 50.
+    const val LEVEL = 100
     const val TEAM_SIZE = 3
     /** order.json trainer index of the Super Single boss (subway_boss_88_ingo). */
     const val BOSS_INGO = 307
