@@ -4,8 +4,8 @@ import com.usumfactory.data.GameData
 import com.usumfactory.data.MoveData
 
 sealed interface Action {
-    /** slot = move slot index, or -1 for Struggle */
-    data class Fight(val slot: Int) : Action
+    /** slot = move slot index, or -1 for Struggle. mega/zMove request Mega Evolution / a Z-move this turn. */
+    data class Fight(val slot: Int, val mega: Boolean = false, val zMove: Boolean = false) : Action
     data class Switch(val index: Int) : Action
 }
 
@@ -26,6 +26,10 @@ sealed interface BattleEvent {
     data class WeatherChanged(val weather: Weather) : BattleEvent
     /** A substitute doll appeared (up = true) or broke (up = false) on [side]. */
     data class Substitute(val side: Int, val up: Boolean) : BattleEvent
+    /** [side]'s Pokémon Mega-Evolved (sprite/name refresh + flash). */
+    data class MegaEvolve(val side: Int, val mon: BattleMon) : BattleEvent
+    /** [side] unleashed a Z-move. */
+    data class ZMove(val side: Int, val move: MoveData) : BattleEvent
 }
 
 interface BattleController {
@@ -320,6 +324,11 @@ class Battle(
                 msg("${Josa.eunNeun(nm(m))} 기합을 모으고 있다!")
             }
         }
+        // Mega Evolution happens at the start of the turn, before move order (it can change Speed).
+        for (i in 0..1) {
+            val a = actionsThisTurn[i]
+            if (a is Action.Fight && a.mega) megaEvolve(sides[i].mon)
+        }
         // Switches first, faster first; Pursuit hits a switching target first.
         val order = orderActions()
         for ((side, action) in order) {
@@ -399,7 +408,22 @@ class Battle(
             move = if (m.encoreMove != null) m.encoreMove!! else slot.move
             if (m.encoreMove != null) slot = m.moves.firstOrNull { it.move.id == move.id } ?: slot
         }
+        // Z-move: a matching Z-crystal turns one damaging move into a boosted Z-move (once per battle).
+        if (a.zMove && canZMove(m, move)) {
+            m.usedZ = true
+            m.zMoveActive = true
+            msg("${Josa.eunNeun(nm(m))} Z파워를 해방했다!")
+            emit(BattleEvent.ZMove(m.side, move))
+        }
         useMove(m, move, slot, fromAction = true, pursuitBoost = pursuitBoost)
+        m.zMoveActive = false
+    }
+
+    /** A damaging move whose type matches the held Z-crystal, usable once per battle. */
+    fun canZMove(m: BattleMon, move: MoveData): Boolean {
+        if (m.usedZ || move.isStatus) return false
+        val zType = It.zCrystalType(m.item)
+        return zType >= 0 && zType == moveType(m, move)
     }
 
     // ------------------------------------------------------------------ switching
@@ -506,6 +530,29 @@ class Battle(
         m.illusionSpecies = -1; m.illusionName = null
         msg("${nm(m)}의 일루전이 풀렸다!")
         emit(BattleEvent.SendOut(m.side, m))
+    }
+
+    /** Whether [m] can Mega-Evolve now: holds the matching Mega Stone and hasn't done so this battle. */
+    fun canMega(m: BattleMon): Boolean {
+        if (m.megaEvolved) return false
+        val mega = data.megasByStone[m.item] ?: return false
+        return mega.species == m.species.id
+    }
+
+    /** Applies the Mega forme: new types, recomputed stats (HP unchanged), new ability, display name. */
+    private suspend fun megaEvolve(m: BattleMon) {
+        if (!canMega(m)) return
+        val mega = data.megasByStone[m.item] ?: return
+        val prefix = if (m.side == 1) "상대 " else ""
+        m.megaEvolved = true
+        m.megaName = mega.nameKo
+        m.types = mega.types.toMutableList()
+        val hp = m.stats[Stat.HP]
+        m.stats = m.info.statsFor(mega.base).also { it[Stat.HP] = hp }
+        m.ability = mega.ability
+        m.baseAbility = mega.ability
+        msg("$prefix${Josa.eunNeun(m.species.nameKo)} 메가진화했다! ${mega.nameKo}!")
+        emit(BattleEvent.MegaEvolve(m.side, m))
     }
 
     private suspend fun onEntry(m: BattleMon) {
@@ -946,8 +993,26 @@ class Battle(
         ((2 * level / 5 + 2).toLong() * power * atk / maxOf(1, def) / 50 + 2).toInt()
 
     /** Internal (visible to tests): effective base power of [move] in [m]'s attack on [t]. */
+    /** Gen 7 Z-move power from a move's base power. */
+    private fun zPower(base: Int): Int = when {
+        base <= 55 -> 100
+        base <= 65 -> 120
+        base <= 75 -> 140
+        base <= 85 -> 160
+        base <= 95 -> 175
+        base <= 100 -> 180
+        base <= 110 -> 185
+        base <= 125 -> 190
+        base <= 130 -> 195
+        else -> 200
+    }
+
     internal fun movePower(m: BattleMon, t: BattleMon, move: MoveData, type: Int, pursuitBoost: Boolean): Int {
         var p = move.power
+        // Z-move: replace the move's power with its Z-power (Gen 7 base-power -> Z-power table) and skip
+        // the normal variable-power rules and item/ability power multipliers. STAB/type effectiveness
+        // are still applied later in calcDamage.
+        if (m.zMoveActive) return zPower(move.power)
         when (move.effect) {
             "INCREASE_POWER_WITH_LESS_HP" -> {
                 val x = 48 * m.hp / m.maxHp

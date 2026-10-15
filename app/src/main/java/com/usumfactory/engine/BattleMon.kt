@@ -47,10 +47,22 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     /** Korean name to display instead of the real one, or null when no illusion is active. */
     var illusionName: String? = null
     val illusionActive: Boolean get() = illusionSpecies >= 0
-    /** The species id the UI should draw (the disguise while Illusion is up). */
+
+    // ---- Mega Evolution: set once this battle, persists until the mon faints/leaves (reset on switch).
+    /** Mega forme display name (e.g. "메가 거북왕") while mega-evolved, else null. */
+    var megaName: String? = null
+    /** Whether this mon has already Mega-Evolved (only one Mega per team/battle in the real games;
+     *  here it's limited per Pokémon, which the one-mega-per-turn UI gate keeps to one per team). */
+    var megaEvolved = false
+    /** Whether this mon has used its Z-move this battle (one per battle). */
+    var usedZ = false
+    /** True while the current move is being unleashed as a Z-move (power override; cleared after use). */
+    var zMoveActive = false
+
+    /** The species id the UI should draw (illusion disguise takes priority). */
     val displaySpecies: Int get() = if (illusionSpecies >= 0) illusionSpecies else species.id
-    /** The name the UI/messages should show (the disguise while Illusion is up). */
-    val displayName: String get() = illusionName ?: species.nameKo
+    /** The name the UI/messages should show (illusion disguise, else mega name, else real name). */
+    val displayName: String get() = illusionName ?: megaName ?: species.nameKo
     val fainted get() = hp <= 0
 
     // ---- volatile state (reset on switch)
@@ -145,6 +157,12 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         illusionSpecies = -1; illusionName = null
         if (powerTrick) {
             powerTrick = false
+            stats = baseStats.copyOf()
+        }
+        // Mega Evolution reverts to the base forme on switch-out (types/stats/ability restored here;
+        // types reset above, stats below from baseStats, ability from baseAbility).
+        if (megaName != null) {
+            megaName = null
             stats = baseStats.copyOf()
         }
         ability = baseAbility

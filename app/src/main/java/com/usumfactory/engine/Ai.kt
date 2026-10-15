@@ -18,7 +18,11 @@ class FactoryAi(private val rng: BattleRandom) {
             val score = score(b, m, t, m.moves[i].move) + rng.next(12)
             if (score > bestScore) { bestScore = score; best = i }
         }
-        return Action.Fight(best)
+        // Mega-Evolve whenever possible (it's strictly better stats). Fire a Z-move on the chosen move
+        // if the crystal matches that move's type (one shot per battle — spend it on the best move).
+        val mega = b.canMega(m)
+        val z = b.canZMove(m, m.moves[best].move)
+        return Action.Fight(best, mega = mega, zMove = z)
     }
 
     fun chooseReplacement(b: Battle, side: Int): Int {

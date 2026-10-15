@@ -77,6 +77,17 @@ data class AbilityData(val id: Int, val key: String, val name: String, val nameK
 @Serializable
 data class NatureData(val id: Int, val key: String, val nameKo: String)
 
+/** A Mega Evolution forme, triggered by holding [stone]. base = HP,Atk,Def,Spe,SpA,SpD. */
+@Serializable
+data class MegaForme(
+    val species: Int,
+    val stone: Int,
+    val nameKo: String,
+    val types: List<Int>,
+    val base: List<Int>,
+    val ability: Int,
+)
+
 @Serializable
 data class TypeData(val id: Int, val key: String, val nameKo: String)
 
@@ -120,8 +131,11 @@ class GameData(
     val types: List<TypeData>,
     sets: List<FactorySet>,
     val trainers: List<TrainerData>,
+    megas: List<MegaForme> = emptyList(),
 ) {
     val species = species.associateBy { it.id }
+    /** Mega formes keyed by the Mega Stone item id that triggers them. */
+    val megasByStone = megas.associateBy { it.stone }
     val moves = moves.associateBy { it.id }
     val movesByKey = moves.associateBy { it.key }
     val items = items.associateBy { it.id }
@@ -164,6 +178,7 @@ class GameData(
             json.decodeFromString(read("data/types.json")),
             json.decodeFromString(read("data/sets.json")),
             json.decodeFromString(read("data/trainers.json")),
+            runCatching { json.decodeFromString<List<MegaForme>>(read("data/megas.json")) }.getOrDefault(emptyList()),
         )
     }
 }

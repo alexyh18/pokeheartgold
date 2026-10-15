@@ -236,6 +236,13 @@ object It {
         187 to (Types.GHOST to 80), 188 to (Types.DRAGON to 80), 189 to (Types.DARK to 80),
     )
 
+    /** Z-crystals use synthetic ids 9000+ (type = id - 9000), matching the extractor's items.json. */
+    const val Z_BASE = 9000
+    fun zCrystalForType(type: Int) = Z_BASE + type
+    fun isZCrystal(id: Int) = id in Z_BASE until (Z_BASE + 18)
+    /** The type a Z-crystal powers up, or -1 if the item isn't a Z-crystal. */
+    fun zCrystalType(id: Int) = if (isZCrystal(id)) id - Z_BASE else -1
+
     fun isBerry(id: Int) = id in 126..189 || id == 2278 || id == 2279
     fun isChoice(id: Int) = id == CHOICE_BAND || id == CHOICE_SCARF || id == CHOICE_SPECS
 }

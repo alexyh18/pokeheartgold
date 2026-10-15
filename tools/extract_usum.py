@@ -81,6 +81,17 @@ def norm(name):
     return s
 
 
+# Z-crystals aren't in the PokeAPI CSV dump, so they use synthetic ids (9001+) consistent with the
+# engine's It.Z_CRYSTALS. "<Set item name>" -> (synthetic id, engine type id, Korean name).
+Z_CRYSTALS = {
+    "Normalium Z": (9000, 0, "노말Z"), "Fightinium Z": (9001, 1, "격투Z"), "Flyinium Z": (9002, 2, "비행Z"),
+    "Poisonium Z": (9003, 3, "독Z"), "Groundium Z": (9004, 4, "땅Z"), "Rockium Z": (9005, 5, "바위Z"),
+    "Buginium Z": (9006, 6, "벌레Z"), "Ghostium Z": (9007, 7, "고스트Z"), "Steelium Z": (9008, 8, "강철Z"),
+    "Firium Z": (9009, 9, "불꽃Z"), "Waterium Z": (9010, 10, "물Z"), "Grassium Z": (9011, 11, "풀Z"),
+    "Electrium Z": (9012, 12, "전기Z"), "Psychium Z": (9013, 13, "에스퍼Z"), "Icium Z": (9014, 14, "얼음Z"),
+    "Dragonium Z": (9015, 15, "드래곤Z"), "Darkinium Z": (9016, 16, "악Z"), "Fairium Z": (9017, 17, "페어리Z"),
+}
+
 # Data-file typos / Gen7-form names that must map to a base species or canonical slug.
 ABILITY_ALIAS = {"telepahty": "telepathy"}
 # Alternate-form set names -> base species name present in the Pokedex TSV. Forms reuse the base
@@ -247,6 +258,32 @@ def main():
             "genderRatio": gender_ratio, "final": name not in pre_evos,
         }
 
+    # ---------- Mega formes (dex rows whose Forme contains "Mega") keyed by base Ndex ----------
+    # The Battle Tree pool has no Charizard/Mewtwo mega sets, so one mega forme per base species is
+    # unambiguous. Each entry carries the mega's types/base stats/ability; the stone id is filled below.
+    mega_by_species = {}
+    for r in dex:
+        forme = r.get("Forme", "").strip()
+        if "Mega" not in forme:
+            continue
+        if not r.get("Ndex", "").strip().isdigit():
+            continue
+        ndex = int(r["Ndex"])
+        mtypes = [TYPE_ID[r["Type1"].strip()]]
+        mt2 = r.get("Type2", "").strip()
+        if mt2 and mt2 != "#N/A" and mt2 in TYPE_ID:
+            mtypes.append(TYPE_ID[mt2])
+        ma = r.get("Ability1", "").strip()
+        ma_id = abilities_csv.get(norm(ma)) if ma and ma != "#N/A" else None
+        if ma_id is not None:
+            used_abilities.add(norm(ma))
+        mbase = [int(r["HP"]), int(r["Attack"]), int(r["Defense"]),
+                 int(r["Speed"]), int(r["SpAttack"]), int(r["SpDefense"])]
+        mega_by_species[ndex] = {
+            "species": ndex, "stone": 0, "nameKo": "메가 " + ko_species.get(str(ndex), r["Species"].strip()),
+            "types": mtypes, "base": mbase, "ability": ma_id if ma_id is not None else 0,
+        }
+
     # ---------- sets (Pokemon-Table) ----------
     set_rows = csv_rows(os.path.join(TREE, "Pokemon-Table 1.csv"), delim=";")
     natures_out, nature_eid = build_natures()
@@ -256,10 +293,10 @@ def main():
     sets = []
     used_moves = {}   # slug -> move_id
     used_items = set()
+    used_z = {}       # z-item id -> (type, nameKo)
     species_set_ids = {}  # dex id -> [set ids]
     cur = None
     sid = 0
-    skipped_mega = 0
     unknown = set()
     for row in set_rows[1:]:
         if not any(c.strip() for c in row):
@@ -267,9 +304,7 @@ def main():
         name = row[0].strip()
         if name:
             cur = name
-        if row[1].strip().lower() == "mega":   # skip Mega sets for v1 (no mega stats/sprites)
-            skipped_mega += 1
-            continue
+        is_mega = row[1].strip().lower() == "mega"
         resolved = FORM_TO_BASE.get(cur, cur)
         if resolved not in species_dex:
             unknown.add(cur); continue
@@ -278,11 +313,18 @@ def main():
         nid = nature_eid.get(nature_name, 0)
         item_name = row[3].strip()
         item_id = 0
-        if item_name:
+        if item_name in Z_CRYSTALS:
+            zid, ztype, zko = Z_CRYSTALS[item_name]
+            item_id = zid
+            used_z[zid] = (ztype, zko)
+        elif item_name:
             islug = norm(item_name)
             item_id = items_csv.get(islug, 0)
             if item_id:
                 used_items.add(islug)
+            # a Mega set's stone links the base species to its mega forme
+            if is_mega and dexid in mega_by_species and item_id:
+                mega_by_species[dexid]["stone"] = item_id
         move_ids = []
         for c in row[4:8]:
             mv = c.strip()
@@ -300,13 +342,14 @@ def main():
         evs = [csv_ev[0], csv_ev[1], csv_ev[2], csv_ev[5], csv_ev[3], csv_ev[4]]  # -> HP,Atk,Def,Spe,SpA,SpD
         sets.append({
             "id": sid, "species": dexid, "moves": move_ids, "evs": evs,
-            "nature": nid, "item": item_id, "form": 0, "super": True,
+            "nature": nid, "item": item_id, "form": 1 if is_mega else 0, "super": True,
         })
         species_set_ids.setdefault(dexid, []).append(sid)
         sid += 1
 
-    print("sets:", len(sets), "skipped mega:", skipped_mega,
-          "species in pool:", len(species_set_ids))
+    megas_out = [m for m in mega_by_species.values() if m["stone"] != 0]
+    print("sets:", len(sets), "mega sets kept:", sum(1 for s in sets if s["form"] == 1),
+          "mega formes:", len(megas_out), "z-crystals:", len(used_z), "species in pool:", len(species_set_ids))
     if unknown:
         print("UNRESOLVED (first 20):", sorted(unknown)[:20])
 
@@ -322,6 +365,11 @@ def main():
     ko_item = ko_names("item_names", "item_id")
     items_out = [{"id": 0, "key": "none", "name": "None", "nameKo": "없음", "desc": "",
                   "holdEffect": "NONE", "holdParam": 0, "flingPower": 0}]
+    for zid, (ztype, zko) in sorted(used_z.items()):
+        items_out.append({
+            "id": zid, "key": "zcrystal_%d" % ztype, "name": zko, "nameKo": zko, "desc": "",
+            "holdEffect": "Z_CRYSTAL", "holdParam": ztype, "flingPower": 0,
+        })
     for slug in sorted(used_items, key=lambda s: items_csv.get(s, 0)):
         iid = items_csv[slug]
         items_out.append({
@@ -356,8 +404,9 @@ def main():
     write("data/types.json", build_types())
     write("data/sets.json", sets)
     write("data/trainers.json", trainers_out)
-    print("DONE. species=%d moves=%d items=%d abilities=%d sets=%d trainers=%d" % (
-        len(species_set_ids), len(moves_out), len(items_out), len(abil_out), len(sets), len(trainers_out)))
+    write("data/megas.json", megas_out)
+    print("DONE. species=%d moves=%d items=%d abilities=%d sets=%d trainers=%d megas=%d" % (
+        len(species_set_ids), len(moves_out), len(items_out), len(abil_out), len(sets), len(trainers_out), len(megas_out)))
 
 
 # ---- move effect derivation ----------------------------------------------------------

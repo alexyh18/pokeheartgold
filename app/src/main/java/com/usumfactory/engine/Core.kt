@@ -120,8 +120,9 @@ class MonInfo(val data: GameData, val mon: FactoryMon) {
         val ev = if (n == 0) 0 else minOf(255, 510 / n)
         IntArray(6) { if (set.evs[it]) ev else 0 }
     }
-    val stats: IntArray = IntArray(6) { i ->
-        val b = species.base[i]
+    /** Battle stats from a base-stat list (HP,Atk,Def,Spe,SpA,SpD) using this mon's level/IV/EV/nature. */
+    fun statsFor(base: List<Int>): IntArray = IntArray(6) { i ->
+        val b = base[i]
         val lv = mon.level
         val core = (2 * b + mon.iv + evs[i] / 4) * lv / 100
         if (i == Stat.HP) core + lv + 10
@@ -138,6 +139,7 @@ class MonInfo(val data: GameData, val mon: FactoryMon) {
             }
         }
     }
+    val stats: IntArray = statsFor(species.base)
     val friendship: Int get() = if (set.moves.contains(218)) 0 else 255 // Frustration -> 0
 }
 

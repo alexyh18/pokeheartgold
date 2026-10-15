@@ -248,6 +248,23 @@ class BattleSession(
                     v.substitute = false
                 }
             }
+            is BattleEvent.MegaEvolve -> {
+                // Flash + refresh: the sprite reads v.mon.displaySpecies (unchanged here, base sprite),
+                // the HUD name reads displayName which now returns the Mega name.
+                val v = views[e.side]
+                v.flashUp = true
+                v.lunge.snapTo(0f)
+                v.lunge.animateTo(1f, (160 * animScale).toInt().coerceAtLeast(1))
+                v.lunge.animateTo(0f, (160 * animScale).toInt().coerceAtLeast(1))
+                delay((200 * animScale).toLong())
+                v.flashUp = null
+            }
+            is BattleEvent.ZMove -> {
+                val v = views[e.side]
+                v.flashUp = true
+                delay((300 * animScale).toLong())
+                v.flashUp = null
+            }
         }
     }
 }

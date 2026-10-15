@@ -486,7 +486,32 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
     val m = s.player.mon
     val usable = s.battle.usableSlots(m)
     val data = vm.data
+    // Mega Evolution / Z-move toggles: shown only when the active Pokémon can do them.
+    var megaOn by remember(m) { mutableStateOf(false) }
+    var zOn by remember(m) { mutableStateOf(false) }
+    val canMega = s.battle.canMega(m)
+    val canZAny = !m.usedZ && com.usumfactory.engine.It.zCrystalType(s.battle.item(m)) >= 0
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (canMega || canZAny) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (canMega) {
+                    val c = if (megaOn) Color(0xFFB060D0) else Color(0xFF4A5560)
+                    Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp)).background(c)
+                        .border(2.dp, if (megaOn) Color.White else Color(0x55FFFFFF), RoundedCornerShape(8.dp))
+                        .clickable { megaOn = !megaOn }, contentAlignment = Alignment.Center) {
+                        Text(if (megaOn) "메가진화 ✔" else "메가진화", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+                if (canZAny) {
+                    val c = if (zOn) Color(0xFFE0A020) else Color(0xFF4A5560)
+                    Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp)).background(c)
+                        .border(2.dp, if (zOn) Color.White else Color(0x55FFFFFF), RoundedCornerShape(8.dp))
+                        .clickable { zOn = !zOn }, contentAlignment = Alignment.Center) {
+                        Text(if (zOn) "Z기술 ✔" else "Z기술", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
         if (usable.isEmpty()) {
             BwButton("발버둥", Modifier.fillMaxWidth().weight(1f)) { s.choose(Action.Fight(-1)) }
         } else {
@@ -495,7 +520,9 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                     row.forEachIndexed { c, slot ->
                         val i = r * 2 + c
                         val ok = i in usable
-                        val col = Bw.typeColor(s.battle.moveType(m, slot.move))
+                        // Z only applies to a damaging move whose type matches the crystal.
+                        val zForThis = zOn && s.battle.canZMove(m, slot.move)
+                        val col = if (zForThis) Color(0xFFE0A020) else Bw.typeColor(s.battle.moveType(m, slot.move))
                         Column(
                             Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp))
                                 .background(if (ok) Brush.verticalGradient(listOf(col, col.copy(red = col.red * 0.65f, green = col.green * 0.65f, blue = col.blue * 0.65f)))
@@ -503,7 +530,7 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                                 .border(2.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                                 .combinedClickable(
                                     enabled = true,
-                                    onClick = { if (ok) s.choose(Action.Fight(i)) else s.message = "${Josa.eunNeun(slot.move.nameKo)} 지금 쓸 수 없다!" },
+                                    onClick = { if (ok) s.choose(Action.Fight(i, mega = megaOn && canMega, zMove = zOn && s.battle.canZMove(m, slot.move))) else s.message = "${Josa.eunNeun(slot.move.nameKo)} 지금 쓸 수 없다!" },
                                     onLongClick = { s.message = slot.move.desc },
                                 )
                                 .padding(8.dp),
