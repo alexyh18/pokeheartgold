@@ -1409,6 +1409,13 @@ class Battle(
         if (e == "SWITCH_HIT" && !m.fainted && hitTarget && sides[m.side].switchTargets().isNotEmpty() && sides[1 - m.side].alive() > 0) {
             pivot(m, batonPass = false)
         }
+        // Dragon Tail / Circle Throw: after dealing damage, drag the target out for a random party member.
+        // Fails silently (no switch) vs Suction Cups, an Ingrained target, a fainted target, or an empty bench.
+        if (e == "CIRCLE_THROW" && hitTarget && !t.fainted && !subHit &&
+            defAbility(m, t) != Ab.SUCTION_CUPS && !t.ingrained && sideOf(t).switchTargets().isNotEmpty()
+        ) {
+            dragOut(m, t)
+        }
         // Grudge/destiny bond only last until the user's next move
     }
 
@@ -1516,6 +1523,29 @@ class Battle(
         }
     }
 
+    /**
+     * Drags [t] out and sends in a random healthy party member. Shared by Whirlwind/Roar (FORCE_SWITCH)
+     * and the damaging Dragon Tail / Circle Throw (CIRCLE_THROW). Callers must ensure a target exists
+     * and the move is allowed (Suction Cups / Ingrain are checked by the caller for status moves; for
+     * Dragon Tail they simply fail to drag after the hit, handled where this is called).
+     */
+    private suspend fun dragOut(m: BattleMon, t: BattleMon) {
+        val side = sideOf(t)
+        val opts = side.switchTargets()
+        if (opts.isEmpty()) return
+        val idx = opts[rng.next(opts.size)]
+        emit(BattleEvent.Withdraw(t.side))
+        t.resetVolatile()
+        side.active = idx
+        val nmon = side.mon
+        nmon.resetVolatile()
+        setupIllusion(nmon)
+        msg("${Josa.iGa(nm(nmon))} 끌려 나왔다!")
+        emit(BattleEvent.SendOut(t.side, nmon))
+        entryHazards(nmon)
+        if (!nmon.fainted) onEntry(nmon) else faint(nmon)
+    }
+
     // ------------------------------------------------------------------ status moves aimed at the foe
     private suspend fun statusMove(m: BattleMon, t: BattleMon, move: MoveData) {
         val e = move.effect
@@ -1604,25 +1634,11 @@ class Battle(
                 else { val n = minOf(4, s.pp); s.pp -= n; msg("${nm(t)}의 ${Josa.eulReul(mvName(s.move))} ${n}만큼 줄였다!") }
             }
             "FORCE_SWITCH" -> {
-                val side = sideOf(t)
                 when {
                     defAbility(m, t) == Ab.SUCTION_CUPS -> { msg("${nm(t)}의 흡반!"); msg("${Josa.eunNeun(nm(t))} 영향을 받지 않았다!") }
                     t.ingrained -> msg("${Josa.eunNeun(nm(t))} 뿌리를 내리고 있다!")
-                    side.switchTargets().isEmpty() -> msg("하지만 실패했다!")
-                    else -> {
-                        val opts = side.switchTargets()
-                        val idx = opts[rng.next(opts.size)]
-                        emit(BattleEvent.Withdraw(t.side))
-                        val old = t
-                        old.resetVolatile()
-                        side.active = idx
-                        val nmon = side.mon
-                        nmon.resetVolatile()
-                        msg("${Josa.iGa(nm(nmon))} 끌려 나왔다!")
-                        emit(BattleEvent.SendOut(t.side, nmon))
-                        entryHazards(nmon)
-                        if (!nmon.fainted) onEntry(nmon) else faint(nmon)
-                    }
+                    sideOf(t).switchTargets().isEmpty() -> msg("하지만 실패했다!")
+                    else -> dragOut(m, t)
                 }
             }
             "SWITCH_HELD_ITEMS" -> {
