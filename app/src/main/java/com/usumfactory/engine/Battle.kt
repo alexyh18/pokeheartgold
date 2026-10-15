@@ -574,9 +574,13 @@ class Battle(
         m.megaEvolved = true
         m.megaName = mega.nameKo
         if (mega.sprite > 0) m.megaSprite = mega.sprite
+        m.megaTypes = mega.types
         m.types = mega.types.toMutableList()
-        val hp = m.stats[Stat.HP]
-        m.stats = m.info.statsFor(mega.base).also { it[Stat.HP] = hp }
+        // Mega stats become the new baseline so the forme persists through switch-outs (resetVolatile
+        // restores stats from baseStats). HP is unchanged by Mega Evolution.
+        val megaStats = m.info.statsFor(mega.base).also { it[Stat.HP] = m.stats[Stat.HP] }
+        megaStats.copyInto(m.baseStats)
+        m.stats = megaStats.copyOf()
         m.ability = mega.ability
         m.baseAbility = mega.ability
         msg("$prefix${Josa.eunNeun(m.species.nameKo)} 메가진화했다! ${mega.nameKo}!")

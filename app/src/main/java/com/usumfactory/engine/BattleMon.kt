@@ -61,6 +61,8 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
 
     /** Sprite id to draw while mega-evolved (the mega form's own art), or -1 if not mega. */
     var megaSprite: Int = -1
+    /** Mega forme's types, kept so the forme persists across switch-outs (Mega lasts the whole battle). */
+    var megaTypes: List<Int>? = null
     /** Mimikyu: its Disguise has been broken (Busted form). Drives the sprite + prevents re-nullify. */
     var busted = false
 
@@ -149,7 +151,9 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var gemConsumedType = -1
 
     fun resetVolatile() {
-        types = species.types.toMutableList()
+        // A Mega-Evolved Pokémon keeps its forme (types + stats + ability) across switch-outs for the
+        // whole battle; otherwise types revert to the base species.
+        types = (megaTypes ?: species.types).toMutableList()
         stages.fill(0)
         confusion = 0; flinch = false; leechSeeded = false; substituteHp = 0
         protectCount = 0; protecting = false; enduring = false
@@ -167,17 +171,10 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         usedMoves.clear(); metronomeCount = 0; metronomeMove = null; focusPunchCharging = false
         focusEnergy = false; healBlockTurns = 0; embargoTurns = 0; wishTurns = 0; wishHp = 0; gemConsumedType = -1
         illusionSpecies = -1; illusionName = null
-        if (powerTrick) {
-            powerTrick = false
-            stats = baseStats.copyOf()
-        }
-        // Mega Evolution reverts to the base forme on switch-out (types/stats/ability restored here;
-        // types reset above, stats below from baseStats, ability from baseAbility).
-        if (megaName != null) {
-            megaName = null
-            megaSprite = -1
-            stats = baseStats.copyOf()
-        }
+        powerTrick = false
+        // Reset battle stats to the baseline. For a Mega-Evolved mon, baseStats already holds the mega
+        // stats (set in megaEvolve), so the forme persists across switch-outs for the whole battle.
+        stats = baseStats.copyOf()
         ability = baseAbility
         mimicOriginal?.let { (i, slot) -> moves[i] = slot }
         mimicOriginal = null
