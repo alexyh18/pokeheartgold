@@ -91,6 +91,12 @@ class Battle(
         "feint", "phantom_force", "shadow_force", "hyperspace_hole", "hyperspace_fury",
     )
 
+    /** Powder/spore moves (Gen 6+: Grass-types are immune). Rage Powder's redirection is a no-op in a
+     *  1v1 battle, so it's covered here for completeness but has no additional effect. */
+    private val powderMoves = setOf(
+        "sleep_powder", "stun_spore", "poison_powder", "spore", "cotton_spore", "rage_powder", "powder",
+    )
+
     fun foe(m: BattleMon) = sides[1 - m.side].mon
     fun sideOf(m: BattleMon) = sides[m.side]
 
@@ -277,6 +283,9 @@ class Battle(
     }
 
     private fun isTrapped(m: BattleMon): Boolean {
+        // Gen 6+: Ghost-types can always flee/switch, ignoring Mean Look, Block, binding moves,
+        // Arena Trap, Magnet Pull, Shadow Tag, etc.
+        if (m.hasType(Types.GHOST)) return false
         if (m.trapped || m.bindTurns > 0 || m.ingrained) return true
         val f = foe(m)
         if (f.fainted) return false
@@ -1815,6 +1824,11 @@ class Battle(
         if (ability(m) == Ab.PRANKSTER && t.hasType(Types.DARK) && m !== t) {
             msg("${Josa.eunNeun(nm(t))} 짓궂은 마음의 영향을 받지 않는다!"); return
         }
+        // Gen 6+: Grass-types are immune to powder/spore moves (Sleep Powder, Stun Spore, Spore,
+        // Cotton Spore, …), including Rage Powder's redirection (which is a no-op here anyway).
+        if (move.key in powderMoves && m !== t && t.hasType(Types.GRASS)) {
+            msg("${nm(t)}에게는 효과가 없는 것 같다…"); return
+        }
         val behindSub = t.substituteHp > 0 && !move.has("BYPASS_SUBSTITUTE") && !move.has("SOUND")
         val subBlocks = behindSub && e !in setOf("FORCE_SWITCH", "DISABLE", "ENCORE", "TAUNT", "TORMENT", "FORESIGHT", "INFATUATE", "PREVENT_ESCAPE", "DECREASE_LAST_MOVE_PP", "SWITCH_HELD_ITEMS", "SUPRESS_ABILITY", "AVERAGE_HP", "COPY_STAT_CHANGES", "ALL_FAINT_3_TURNS")
         if (subBlocks) { msg("하지만 실패했다!"); return }
@@ -1893,7 +1907,8 @@ class Battle(
             }
             "TORMENT" -> if (t.tormented) msg("하지만 실패했다!") else { t.tormented = true; msg("${Josa.eunNeun(nm(t))} 트집을 잡혔다!") }
             "FORESIGHT" -> { t.foresighted = true; msg("${Josa.eunNeun(nm(m))} ${Josa.eulReul(nm(t))} 꿰뚫어 보았다!") }
-            "PREVENT_ESCAPE" -> if (t.trapped) msg("하지만 실패했다!") else { t.trapped = true; msg("${Josa.eunNeun(nm(t))} 이제 도망갈 수 없다!") }
+            // Gen 6+: Mean Look/Block/Spider Web fail against Ghost-types (they can't be trapped).
+            "PREVENT_ESCAPE" -> if (t.trapped || t.hasType(Types.GHOST)) msg("하지만 실패했다!") else { t.trapped = true; msg("${Josa.eunNeun(nm(t))} 이제 도망갈 수 없다!") }
             "DECREASE_LAST_MOVE_PP" -> {
                 val s = t.moves.firstOrNull { it.move.id == t.lastMove?.id }
                 if (s == null || s.pp == 0) msg("하지만 실패했다!")
@@ -2265,6 +2280,8 @@ class Battle(
             Status.POISON, Status.TOXIC -> t.hasType(Types.POISON) || t.hasType(Types.STEEL)
             Status.BURN -> t.hasType(Types.FIRE)
             Status.FREEZE -> t.hasType(Types.ICE) || effWeather() == Weather.SUN
+            // Gen 6+: Electric-types can't be paralyzed (by any source — Body Slam, Glare, Static, …).
+            Status.PARALYSIS -> t.hasType(Types.ELECTRIC)
             else -> false
         }
         if (typeImmune) { if (!silentFail) msg("${nm(t)}에게는 효과가 없는 것 같다…"); return false }
