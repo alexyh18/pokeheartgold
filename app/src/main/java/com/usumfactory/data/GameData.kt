@@ -150,6 +150,9 @@ class GameData(
     /** Every Battle Tree set is eligible for the pool (the `super` flag marks "in the pool"). */
     val superSetIds: List<Int> = sets.filter { it.species != 0 && it.superCourse }.map { it.id }
 
+    /** Eligible sets that hold a Mega Stone (a Mega Evolution forme exists for the held item). */
+    val megaStoneSetIds: List<Int> = superSetIds.filter { id -> megasByStone.containsKey(this.sets.getValue(id).item) }
+
     fun isEligible(setId: Int): Boolean {
         val s = sets[setId] ?: return false
         return s.species != 0 && s.superCourse

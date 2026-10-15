@@ -41,10 +41,11 @@ object Bw {
     val hpYellow = Color(0xFFF8C800)
     val hpRed = Color(0xFFF83820)
 
+    // Index = engine type id (0 Normal … 16 Dark, 17 Fairy). Fairy is pink.
     private val TYPE_COLORS = longArrayOf(
         0xFFA8A878, 0xFFC03028, 0xFFA890F0, 0xFFA040A0, 0xFFE0C068, 0xFFB8A038, 0xFFA8B820, 0xFF705898,
         0xFFB8B8D0, 0xFFF08030, 0xFF6890F0, 0xFF78C850, 0xFFF8D030, 0xFFF85888, 0xFF98D8D8, 0xFF7038F8,
-        0xFF705848, 0xFF68A090,
+        0xFF705848, 0xFFEE99AC,
     )
 
     fun typeColor(t: Int) = Color(TYPE_COLORS[t.coerceIn(0, TYPE_COLORS.size - 1)])

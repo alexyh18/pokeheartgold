@@ -581,10 +581,19 @@ class Battle(
         m.baseAbility = mega.ability
         msg("$prefix${Josa.eunNeun(m.species.nameKo)} 메가진화했다! ${mega.nameKo}!")
         emit(BattleEvent.MegaEvolve(m.side, m))
+        // The Mega's new ability activates right away (Mega Charizard Y's Drought, Mega Abomasnow's
+        // Snow Warning, Mega Gyarados' Intimidate, …).
+        applyEntryAbility(m)
     }
 
     private suspend fun onEntry(m: BattleMon) {
         m.turnsOnField = 0
+        applyEntryAbility(m)
+    }
+
+    /** Fires the active ability's "on-entry" effect (weather, Intimidate, Download, Trace, …). Also used
+     *  right after Mega Evolution so the Mega's new ability (e.g. Drought) activates immediately. */
+    private suspend fun applyEntryAbility(m: BattleMon) {
         val f = foe(m)
         when (ability(m)) {
             Ab.INTIMIDATE -> if (!f.fainted) {
@@ -603,7 +612,7 @@ class Battle(
             Ab.TRACE -> if (!f.fainted && ability(f) !in setOf(Ab.TRACE, Ab.NONE)) {
                 m.ability = ability(f)
                 msg("${Josa.eunNeun(nm(m))} ${nm(f)}의 ${Josa.eulReul(abName(m.ability))} 트레이스했다!")
-                if (m.ability != Ab.TRACE) onEntry(m)
+                if (m.ability != Ab.TRACE) applyEntryAbility(m)
             }
             Ab.PRESSURE -> msg("${Josa.eunNeun(nm(m))} 프레셔를 발휘하고 있다!")
             Ab.MOLD_BREAKER -> msg("${Josa.eunNeun(nm(m))} 틀깨기다!")
@@ -1919,9 +1928,10 @@ class Battle(
                 msg("${Josa.eunNeun(nm(m))} 체력을 깎아서 공격을 최대로 올렸다!")
             }
             "PROTECT", "SURVIVE_WITH_1_HP" -> {
+                // Consecutive Protect/Endure gets likelier to fail (1/2, 1/4, …). Protect still succeeds
+                // when the user moves last (it just has nothing left to block), matching the games.
                 val chance = 1 shl minOf(m.protectCount, 8)
-                val movesLast = sides.all { it.mon.movedThisTurn || it.mon.fainted }
-                if (movesLast || rng.next(chance) != 0) {
+                if (rng.next(chance) != 0) {
                     m.protectCount = 0; msg("하지만 실패했다!"); return
                 }
                 m.protectCount++

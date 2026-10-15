@@ -82,10 +82,24 @@ object FactoryRules {
         return FactoryMon(setId = setId, iv = IV, pid = pid, level = LEVEL)
     }
 
-    /** The player's rental choices: six sets drawn from the whole Battle Tree pool. */
+    /**
+     * The player's rental choices: six sets from the Battle Tree pool, with ONE guaranteed Mega Stone
+     * holder each round so the player can always Mega-Evolve. The mega mon is placed at a random slot.
+     */
     fun rentals(data: GameData, rng: LcRandom, round: Int, trades: Int): List<FactoryMon> {
-        val picks = pickSets(data, rng, data.superSetIds, 6, emptyList(), emptyList())
-        return picks.map { buildMon(rng, it) }
+        val setIds = mutableListOf<Int>()
+        // 1) one Mega-Stone holder.
+        val megaPool = data.megaStoneSetIds
+        if (megaPool.isNotEmpty()) setIds += megaPool[rng.next() % megaPool.size]
+        // 2) fill the rest from the whole pool, avoiding the mega mon's species.
+        val excludeSp = setIds.map { data.sets.getValue(it).species }
+        setIds += pickSets(data, rng, data.superSetIds, 6 - setIds.size, excludeSp, emptyList())
+        // 3) shuffle so the Mega holder isn't always the first card.
+        for (i in setIds.indices.reversed()) {
+            val j = rng.next() % (i + 1)
+            val t = setIds[i]; setIds[i] = setIds[j]; setIds[j] = t
+        }
+        return setIds.map { buildMon(rng, it) }
     }
 
     /**
