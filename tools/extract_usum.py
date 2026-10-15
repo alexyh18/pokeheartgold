@@ -688,6 +688,9 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         # Dream Eater only works on a sleeping target (and drains HP); PokeAPI tags it as a drain move,
         # which made it hit any target. RECOVER_DAMAGE_SLEEP gates it on the target being asleep.
         "dream_eater": "RECOVER_DAMAGE_SLEEP",
+        # Sleep Talk / Snore can only be used while the user is asleep. The engine gates both by these
+        # effect strings; PokeAPI leaves them as plain status/flinch moves, so set them explicitly.
+        "sleep_talk": "USE_RANDOM_LEARNED_MOVE_SLEEP", "snore": "DAMAGE_WHILE_ASLEEP",
     }
     if s in named and named[s]:
         return named[s]

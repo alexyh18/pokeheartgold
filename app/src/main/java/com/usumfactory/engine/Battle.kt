@@ -83,6 +83,11 @@ class Battle(
     private var lastMoveUsedInBattle: MoveData? = null
     private val actionsThisTurn = arrayOfNulls<Action>(2)
 
+    /** Moves that ignore Protect/Detect (Gen 7). */
+    private val protectBypassMoves = setOf(
+        "feint", "phantom_force", "shadow_force", "hyperspace_hole", "hyperspace_fury",
+    )
+
     fun foe(m: BattleMon) = sides[1 - m.side].mon
     fun sideOf(m: BattleMon) = sides[m.side]
 
@@ -990,7 +995,10 @@ class Battle(
             msg("${Josa.eunNeun(nm(m))} ${Josa.eulReul(mvName(move))} 쓸 수 없다!")
             return
         }
-        if (t.protecting && move.has("PROTECT")) {
+        // Protect/Detect blocks an incoming attack. We reach here only for moves that target the foe
+        // (self/field moves already branched into selfMove), so any such move is blockable unless it is
+        // one of the few Protect-ignoring moves (Feint, Phantom Force, Hyperspace Hole/Fury).
+        if (t.protecting && !move.targetsSelf && !move.targetsField && move.key !in protectBypassMoves) {
             msg("${Josa.eunNeun(nm(t))} 공격으로부터 몸을 지켰다!")
             if (e == "CONTINUE_AND_CONFUSE_SELF") m.lockedMove = null
             crashRecoil(m, move)
@@ -2150,7 +2158,8 @@ class Battle(
             }
             "HIT_IN_3_TURNS" -> {
                 val s = sides[1 - m.side]
-                if (s.futureSightTurns > 0) { msg("하지만 실패했다!"); return }
+                // Fails if a Future Sight is already pending against this side.
+                if (s.futureSightTurns > 0 || s.futureSightMove != null) { msg("하지만 실패했다!"); return }
                 s.futureSightTurns = 3; s.futureSightUser = m; s.futureSightMove = move
                 msg("${Josa.eunNeun(nm(m))} 미래를 내다보았다!")
             }
