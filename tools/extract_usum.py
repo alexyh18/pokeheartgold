@@ -614,6 +614,10 @@ def build_move(slug, mid, ko_move, ko_move_desc, moves_csv):
     cat = (meta.get("category") or {}).get("name", "")
     effect = derive_effect(slug, category, cat, ailment, drain, heal, stat_changes, meta)
     flags = derive_flags(api, category)
+    # Whether a damaging move's stat changes apply to the USER rather than the target. PokeAPI's
+    # meta category "damage-raise" means the user buffs/debuffs itself (Charge Beam +SpA, Overheat
+    # -SpA, Close Combat -Def/-SpD, …); "damage-lower" lowers the target (Crunch, Psychic, …).
+    stats_self = bool(stat_changes) and category != "STATUS" and cat == "damage-raise"
     nameKo = ko_move.get(str(mid), slug.replace("-", " ").title())
     # Korean move description: prefer the CSV flavor text, fall back to the cached PokeAPI entries.
     desc = ko_move_desc.get(str(mid), "")
@@ -627,7 +631,7 @@ def build_move(slug, mid, ko_move, ko_move_desc, moves_csv):
         "accuracy": accuracy if accuracy is not None else 101, "pp": pp, "priority": priority,
         "hitsMin": hits_min, "hitsMax": hits_max, "inflict": inflict, "inflictChance": inflict_chance,
         "crit": crit, "flinch": flinch, "effect": effect, "drain": drain, "heal": heal,
-        "target": derive_target(api), "stats": stat_changes, "flags": flags,
+        "target": derive_target(api), "stats": stat_changes, "statsSelf": stats_self, "flags": flags,
     }
 
 

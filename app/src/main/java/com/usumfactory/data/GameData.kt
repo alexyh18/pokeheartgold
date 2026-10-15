@@ -49,6 +49,9 @@ data class MoveData(
     val heal: Int,
     val target: String,
     val stats: List<StatChangeData>,
+    /** True when a damaging move's [stats] changes apply to the USER (Charge Beam, Overheat, Close
+     *  Combat, …) rather than the target. Defaults to false (target-affecting). */
+    val statsSelf: Boolean = false,
     val flags: List<String>,
 ) {
     val isPhysical get() = category == "PHYSICAL"

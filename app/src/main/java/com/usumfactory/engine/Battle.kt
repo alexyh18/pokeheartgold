@@ -1764,14 +1764,23 @@ class Battle(
             else if (flinch == 0 && (item(m) == It.KINGS_ROCK || item(m) == It.RAZOR_FANG || ability(m) == Ab.STENCH) &&
                 rng.chance(10) && defAbility(m, t) != Ab.INNER_FOCUS) t.flinch = true
         }
-        // stat changes on the target
-        val selfStatEffects = setOf("LOWER_OWN_ATK_AND_DEF", "DEF_SPD_DOWN_HIT", "USER_SP_ATK_DOWN_2", "SPEED_DOWN_HIT")
-        val selfBoostEffects = setOf("RAISE_ATTACK_HIT", "RAISE_DEF_HIT", "RAISE_SP_ATK_HIT", "RAISE_ALL_STATS_HIT")
-        if (e !in selfStatEffects && move.stats.isNotEmpty()) {
+        // Stat changes from a damaging move's secondary effect. `statsSelf` (from the data: PokeAPI's
+        // "damage+raise" category) means they apply to the USER — Charge Beam (+SpA), Overheat (-SpA),
+        // Close Combat (-Def/-SpD), Hammer Arm (-Spe), Superpower (-Atk/-Def), etc. Otherwise they lower
+        // the TARGET (Crunch, Psychic, Shadow Ball, …). The legacy effect-name sets are kept as a
+        // fallback for data that predates the statsSelf flag.
+        val legacySelf = e in setOf(
+            "RAISE_ATTACK_HIT", "RAISE_DEF_HIT", "RAISE_SP_ATK_HIT", "RAISE_ALL_STATS_HIT",
+            "LOWER_OWN_ATK_AND_DEF", "DEF_SPD_DOWN_HIT", "USER_SP_ATK_DOWN_2", "SPEED_DOWN_HIT",
+        )
+        if (move.stats.isNotEmpty()) {
             val chance = move.stats[0].chance
             if (roll(chance)) {
-                val target = if (e in selfBoostEffects) m else t
-                if (!target.fainted) for (s in move.stats) {
+                val toSelf = move.statsSelf || legacySelf
+                val target = if (toSelf) m else t
+                // A self-targeted secondary still applies even if the target fainted; a target-targeted
+                // one is skipped when the target is down.
+                if (toSelf || !target.fainted) for (s in move.stats) {
                     if (s.stat == "ALL") for (st in Stat.ATK..Stat.SPD) changeStage(target, st, s.stages, m)
                     else changeStage(target, Stat.parse(s.stat), s.stages, m)
                 }
