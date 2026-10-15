@@ -520,7 +520,7 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                     row.forEachIndexed { c, slot ->
                         val i = r * 2 + c
                         val ok = i in usable
-                        // Z only applies to a damaging move whose type matches the crystal.
+        // Z applies to any move (damaging or status) whose type matches the held Z-crystal.
                         val zForThis = zOn && s.battle.canZMove(m, slot.move)
                         val col = if (zForThis) Color(0xFFE0A020) else Bw.typeColor(s.battle.moveType(m, slot.move))
                         Column(
@@ -531,7 +531,10 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
                                 .combinedClickable(
                                     enabled = true,
                                     onClick = { if (ok) s.choose(Action.Fight(i, mega = megaOn && canMega, zMove = zOn && s.battle.canZMove(m, slot.move))) else s.message = "${Josa.eunNeun(slot.move.nameKo)} 지금 쓸 수 없다!" },
-                                    onLongClick = { s.message = slot.move.desc },
+                                    onLongClick = {
+                                        val d = slot.move.desc.ifBlank { "${slot.move.nameKo}의 설명 정보가 없습니다." }
+                                        s.message = "${slot.move.nameKo}: $d"
+                                    },
                                 )
                                 .padding(8.dp),
                             verticalArrangement = Arrangement.Center,

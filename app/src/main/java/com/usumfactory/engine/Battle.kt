@@ -427,17 +427,57 @@ class Battle(
     }
 
     /**
-     * The Z-bonus a status move grants when used as a Z-move (Gen 7). Most self-targeting buff moves get
-     * an extra +1 to their key stat; a few signature cases reset stats or heal. Target-only status moves
-     * get no extra on-target bonus here (their normal effect still applied).
+     * The Z-bonus a status move grants when used as a Z-move (Gen 7). This is in addition to the move's
+     * normal effect (which already resolved). Following the official Gen 7 Z-status table:
+     *  - most buff moves grant an extra +1 to a specific stat,
+     *  - healing moves fully restore HP,
+     *  - a handful of signature moves get a special bonus (reset stats, +crit, cure status, etc.).
+     * Moves not in the table grant no extra bonus.
      */
     private suspend fun zStatusBonus(m: BattleMon, move: MoveData) {
+        // 1) Full-heal Z-bonus for recovery/healing moves.
+        val healKeys = setOf(
+            "recover", "roost", "synthesis", "moonlight", "morning_sun", "soft_boiled", "milk_drink",
+            "slack_off", "heal_order", "shore_up", "rest", "wish", "swallow", "heal_pulse",
+            "floral_healing", "aqua_ring", "ingrain",
+        )
+        if (move.key in healKeys) {
+            if (m.hp < m.maxHp) {
+                msg("${Josa.eunNeun(nm(m))} Z파워로 HP를 모두 회복했다!")
+                heal(m, m.maxHp - m.hp)
+            }
+            return
+        }
+        // 2) Signature special bonuses.
+        when (move.key) {
+            "haze" -> {  // reset the user's lowered stats
+                var reset = false
+                for (st in 0..5) if (m.stages[st] < 0) { m.stages[st] = 0; reset = true }
+                if (reset) { emit(BattleEvent.StatusChanged(m.side)); msg("${Josa.eunNeun(nm(m))} Z파워로 능력 하락을 원래대로 되돌렸다!") }
+                return
+            }
+            "bestow", "celebrate", "conversion", "hold_hands" -> return
+        }
+        // 3) +1 stat Z-bonus. Mapped by the move's key, covering the full status-move pool.
         val stat = when (move.key) {
-            "agility", "rock_polish", "autotomize" -> Stat.SPE
-            "work_up", "swords_dance", "howl", "sharpen", "meditate" -> Stat.ATK
-            "defense_curl", "harden", "withdraw", "iron_defense", "cotton_guard" -> Stat.DEF
-            "nasty_plot", "charge_beam" -> Stat.SPA
-            "calm_mind" -> Stat.SPD
+            // Speed
+            "agility", "rock_polish", "autotomize", "tailwind" -> Stat.SPE
+            // Attack
+            "work_up", "swords_dance", "howl", "sharpen", "meditate", "dragon_dance", "shift_gear",
+            "hone_claws", "bulk_up", "coil", "swagger" -> Stat.ATK
+            // Defense
+            "defense_curl", "harden", "withdraw", "iron_defense", "cotton_guard", "acid_armor",
+            "barrier", "stockpile", "cosmic_power", "defend_order", "flower_shield" -> Stat.DEF
+            // Special Attack
+            "nasty_plot", "charge_beam", "flatter" -> Stat.SPA
+            // Special Defense
+            "calm_mind", "amnesia", "charge", "aromatic_mist" -> Stat.SPD
+            // Evasion
+            "double_team", "minimize" -> Stat.EVA
+            // Accuracy
+            "lock_on", "mind_reader", "foresight", "miracle_eye" -> Stat.ACC
+            // Speed boost for multi-stat dance moves (Quiver Dance already raises Spe; Z grants +1 Spe)
+            "quiver_dance" -> Stat.SPE
             else -> -1
         }
         if (stat >= 0 && m.stages[stat] < 6) {
@@ -1896,12 +1936,20 @@ class Battle(
         }
         when (e) {
             // Any self-targeting stat-boost move, driven by its stat_changes data
-            // (Swords Dance, Calm Mind, Quiver Dance, Shift Gear, Coil, Hone Claws, Work Up, Cotton Guard, …).
+            // (Dragon Dance, Calm Mind, Swords Dance, Quiver Dance, Shift Gear, Coil, Hone Claws, Work Up,
+            // Cotton Guard, Nasty Plot, Agility, …). "RAISE_STATS" is the USUM extractor's name for a pure
+            // stat-up self move; "STAT_CHANGE" covers mixed up/down self moves (e.g. Shell Smash style).
+            // Legacy BW2 effect names are kept for backward compatibility.
+            "RAISE_STATS", "STAT_CHANGE",
             "ATK_UP", "ATK_UP_2", "DEF_UP_2", "SPEED_UP_2", "SP_DEF_UP_2", "SP_ATK_UP_2", "EVA_UP", "ATK_DEF_UP",
             "ATK_SPD_UP", "SP_ATK_SP_DEF_UP", "DEF_SPD_UP", "QUIVER_DANCE", "SHIFT_GEAR", "COIL", "HONE_CLAWS",
             "WORK_UP", "COTTON_GUARD", "DEF_UP_DOUBLE_ROLLOUT_POWER" -> {
                 val stats = move.stats.ifEmpty { statlessBoost(e) }
-                if (stats.isNotEmpty() && stats.all { m.stages[Stat.parse(it.stat).coerceAtLeast(1)] >= 6 && it.stages > 0 }) {
+                // Fail only when the move is purely stat-raising and every raised stat is already maxed.
+                val rising = stats.filter { it.stages > 0 }
+                if (rising.isNotEmpty() && rising.size == stats.size &&
+                    rising.all { m.stages[Stat.parse(it.stat).coerceAtLeast(1)] >= 6 }
+                ) {
                     msg("${nm(m)}의 능력은 더 이상 올라가지 않는다!"); return
                 }
                 for (s in stats) changeStage(m, Stat.parse(s.stat), s.stages, m)

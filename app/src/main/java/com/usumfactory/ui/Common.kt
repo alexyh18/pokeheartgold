@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -82,7 +83,14 @@ fun TypeBadge(data: GameData, type: Int) {
     Box(
         Modifier.clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(type)).padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
-        Text(data.typeName(type), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(
+            data.typeName(type),
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
@@ -196,36 +204,59 @@ fun MonCard(vm: GameViewModel, info: MonInfo, selectedIndex: Int?, modifier: Mod
             Spacer(Modifier.width(5.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(info.species.nameKo, color = Bw.text, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    // Name takes the leftover space and truncates with "…" so long names (e.g.
+                    // "불비달마(달마모드)") never push the type badges off the card.
+                    Text(
+                        info.species.nameKo,
+                        color = Bw.text,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
                     Spacer(Modifier.width(4.dp))
-                    info.species.types.forEach { TypeBadge(data, it); Spacer(Modifier.width(2.dp)) }
-                    if (selectedIndex != null) {
-                        Box(Modifier.clip(RoundedCornerShape(50)).background(Bw.gold).padding(horizontal = 5.dp)) {
-                            Text("${selectedIndex + 1}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    // Fixed trailing cluster: type badges + selection number keep their intrinsic
+                    // size regardless of the name length.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        info.species.types.forEach { TypeBadge(data, it); Spacer(Modifier.width(2.dp)) }
+                        if (selectedIndex != null) {
+                            Box(Modifier.clip(RoundedCornerShape(50)).background(Bw.gold).padding(horizontal = 5.dp)) {
+                                Text("${selectedIndex + 1}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
-                Text("특성 ${data.abilityName(info.ability)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1)
-                Text("도구 ${data.itemName(info.set.item)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1)
+                Text("특성 ${data.abilityName(info.ability)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("도구 ${data.itemName(info.set.item)}", color = Bw.textDim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val st = info.stats
                 Text(
                     "H${st[Stat.HP]} 공${st[Stat.ATK]} 방${st[Stat.DEF]} 특공${st[Stat.SPA]} 특방${st[Stat.SPD]} 속${st[Stat.SPE]}",
-                    color = Bw.textDim, fontSize = 9.sp, maxLines = 1,
+                    color = Bw.textDim, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         Spacer(Modifier.height(3.dp))
         val moves = info.set.moves.map { data.move(it) }
+        // Always lay out a fixed 2x2 grid of move chips (empty cells become blank spacers) so every
+        // card is the same height even when a set has fewer than four moves.
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            moves.chunked(2).forEach { row ->
+            for (rowStart in 0 until 4 step 2) {
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    row.forEach { m ->
-                        Box(
-                            Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(m.type).copy(alpha = 0.85f))
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                        ) { Text(m.nameKo, color = Color.White, fontSize = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold) }
+                    for (col in 0 until 2) {
+                        val m = moves.getOrNull(rowStart + col)
+                        if (m != null) {
+                            Box(
+                                Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).background(Bw.typeColor(m.type).copy(alpha = 0.85f))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                            ) { Text(m.nameKo, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) }
+                        } else {
+                            // Blank placeholder keeps the row height and column alignment consistent.
+                            Box(Modifier.weight(1f).padding(vertical = 2.dp)) {
+                                Text("", color = Color.Transparent, fontSize = 10.sp, maxLines = 1)
+                            }
+                        }
                     }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }

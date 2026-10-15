@@ -71,6 +71,33 @@ def ko_names(table, idcol):
     return out
 
 
+def ko_flavor(table, idcol):
+    """Korean flavor text keyed by id, picking the latest game version and flattening newlines.
+
+    The *_flavor_text.csv dumps use `language_id` (not `local_language_id`) and carry one row per
+    version group; we keep the highest version_group_id (newest wording) for each entry.
+    """
+    best = {}  # id -> (version_group_id, text)
+    path = os.path.join(CACHE, table + ".csv")
+    if not os.path.exists(path):
+        return {}
+    for r in dict_rows(path):
+        if r.get("language_id") != KO:
+            continue
+        rid = r.get(idcol)
+        try:
+            vg = int(r.get("version_group_id") or 0)
+        except ValueError:
+            vg = 0
+        text = (r.get("flavor_text") or "").replace("\n", " ").replace("\f", " ").replace("\r", " ")
+        text = " ".join(text.split()).strip()
+        if not text:
+            continue
+        if rid not in best or vg >= best[rid][0]:
+            best[rid] = (vg, text)
+    return {k: v[1] for k, v in best.items()}
+
+
 def norm(name):
     """Normalize a display name to a PokeAPI slug."""
     s = name.strip().lower()
@@ -441,10 +468,11 @@ def main():
 
     # ---------- moves (enrich via PokeAPI) ----------
     ko_move = ko_names("move_names", "move_id")
+    ko_move_desc = ko_flavor("move_flavor_text", "move_id")
     moves_out = []
     EXTRA = {"struggle": 165}
     for slug, mid in sorted({**used_moves, **EXTRA}.items(), key=lambda x: x[1]):
-        moves_out.append(build_move(slug, mid, ko_move, moves_csv))
+        moves_out.append(build_move(slug, mid, ko_move, ko_move_desc, moves_csv))
     print("moves:", len(moves_out))
 
     # ---------- items / abilities ----------
@@ -512,7 +540,7 @@ AILMENT_TO_INFLICT = {
 STAT_TO_KEY = {1: "ATK", 2: "DEF", 3: "SPE", 4: "SPA", 5: "SPD", 6: "ACC", 7: "EVA"}  # PokeAPI stat ids
 
 
-def build_move(slug, mid, ko_move, moves_csv):
+def build_move(slug, mid, ko_move, ko_move_desc, moves_csv):
     api = api_get("move/%s" % slug)
     base = moves_csv.get(slug, {})
     # type
@@ -557,9 +585,15 @@ def build_move(slug, mid, ko_move, moves_csv):
     effect = derive_effect(slug, category, cat, ailment, drain, heal, stat_changes, meta)
     flags = derive_flags(api, category)
     nameKo = ko_move.get(str(mid), slug.replace("-", " ").title())
+    # Korean move description: prefer the CSV flavor text, fall back to the cached PokeAPI entries.
+    desc = ko_move_desc.get(str(mid), "")
+    if not desc and api:
+        kos = [e for e in (api.get("flavor_text_entries") or []) if (e.get("language") or {}).get("name") == "ko"]
+        if kos:
+            desc = " ".join((kos[-1].get("flavor_text") or "").split()).strip()
     return {
         "id": mid, "key": slug.replace("-", "_"), "name": slug.replace("-", " ").title(),
-        "nameKo": nameKo, "desc": "", "type": tid, "category": category, "power": power or 0,
+        "nameKo": nameKo, "desc": desc, "type": tid, "category": category, "power": power or 0,
         "accuracy": accuracy if accuracy is not None else 101, "pp": pp, "priority": priority,
         "hitsMin": hits_min, "hitsMax": hits_max, "inflict": inflict, "inflictChance": inflict_chance,
         "crit": crit, "flinch": flinch, "effect": effect, "drain": drain, "heal": heal,
