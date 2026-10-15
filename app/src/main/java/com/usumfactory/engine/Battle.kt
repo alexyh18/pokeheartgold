@@ -1096,9 +1096,16 @@ class Battle(
                 p = when (left) { 0 -> 200; 1 -> 80; 2 -> 60; 3 -> 50; else -> 40 }
             }
             "DOUBLE_POWER_IF_MOVING_SECOND" -> if (t.movedThisTurn) p *= 2
-            "DOUBLE_POWER_IF_HIT" -> if (m.lastHitBy === t && m.tookDamageThisTurn) p *= 2
+            "DOUBLE_POWER_IF_HIT" -> if (m.tookDamageThisTurn) p *= 2
             "DOUBLE_POWER_WHEN_BELOW_HALF" -> if (t.hp * 2 <= t.maxHp) p *= 2
             "DOUBLE_POWER_WHEN_STATUSED" -> if (m.status != Status.NONE) p *= 2
+            "DOUBLE_POWER_IF_TARGET_STATUSED" -> if (t.status != Status.NONE) p *= 2
+            "DOUBLE_IF_TARGET_PARALYZED" -> if (t.status == Status.PARALYSIS) p *= 2
+            "DOUBLE_IF_TARGET_ASLEEP" -> if (t.status == Status.SLEEP) p *= 2
+            // Eruption / Water Spout: power scales with the user's current HP (max 150, min 1).
+            "POWER_BY_USER_HP" -> p = maxOf(1, p * m.hp / m.maxHp)
+            // Stored Power / Power Trip: 20 + 20 per positive stat stage the USER has.
+            "POWER_BY_USER_STAT_UP" -> p = minOf(860, 20 + 20 * (1..7).sumOf { maxOf(0, m.stages[it]) })
             "CHANGE_TYPE_WITH_WEATHER" -> if (effWeather() != Weather.NONE) p *= 2
             "SPIT_UP" -> p = 100 * m.stockpile
             "FLING" -> p = data.items[item(m)]?.flingPower ?: 0
@@ -1268,6 +1275,10 @@ class Battle(
 
     private suspend fun attack(m: BattleMon, t: BattleMon, move: MoveData, type: Int, pursuitBoost: Boolean) {
         val e = move.effect
+        // Explosion / Self-Destruct are prevented entirely (user does NOT faint) by Damp.
+        if (e == "USER_FAINTS" && defAbility(m, t) == Ab.DAMP) {
+            msg("${nm(t)}의 ${abName(Ab.DAMP)}로 ${Josa.eulReul(mvName(move))} 쓸 수 없다!"); return
+        }
         // ---- damage that ignores the formula
         val fixed: Int? = when (e) {
             "COUNTER" -> if (m.lastHitBy === t && m.lastDamagePhysical > 0) m.lastDamagePhysical * 2 else -1
@@ -1311,6 +1322,8 @@ class Battle(
             if (e == "CONTINUE_AND_CONFUSE_SELF") m.lockedMove = null
             // Jump Kick / High Jump Kick crashes when it hits a target it can't affect (e.g. a Ghost).
             crashRecoil(m, move)
+            // Explosion / Self-Destruct still makes the user faint even against an immune target.
+            if (e == "USER_FAINTS" && !m.fainted) { damage(m, m.hp); faint(m) }
             return
         }
         // Wonder-Guard-like checks aren't needed for the Factory pool.
@@ -1526,6 +1539,9 @@ class Battle(
         if (t.fainted && !m.fainted && ability(m) == Ab.MOXIE && m.stages[Stat.ATK] < 6) {
             msg("${nm(m)}의 자기과신!"); changeStage(m, Stat.ATK, 1, m)
         }
+        // Explosion / Self-Destruct: the user faints after the move resolves. Do this BEFORE announcing
+        // the target's faint, so a double-KO still faints the user even if checkOver() ends the battle.
+        if (e == "USER_FAINTS" && !m.fainted) damage(m, m.hp)
         // faints
         if (t.fainted) {
             if (t.destinyBond && !m.fainted) {
@@ -1536,6 +1552,7 @@ class Battle(
                 m.moves.firstOrNull { it.move.id == move.id }?.let { it.pp = 0 }
                 msg("${nm(m)}의 ${Josa.iGa(mvName(move))} 원념으로 PP가 0이 되었다!")
             }
+            if (m.fainted) faint(m)  // the exploding user is announced first on a double KO
             faint(t)
         }
         if (m.fainted) faint(m)

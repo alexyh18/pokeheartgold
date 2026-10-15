@@ -587,6 +587,22 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "pursuit": "HIT_BEFORE_SWITCH", "fly": "FLY", "dig": "DIG", "dive": "DIVE",
         "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
+        # self-KO moves: the user faints after dealing damage
+        "explosion": "USER_FAINTS", "self_destruct": "USER_FAINTS", "misty_explosion": "USER_FAINTS",
+        "memento": "USER_FAINTS_LOWER_FOE", "healing_wish": "USER_FAINTS_HEAL_SWITCHIN",
+        # variable-power moves
+        "flail": "INCREASE_POWER_WITH_LESS_HP", "reversal": "INCREASE_POWER_WITH_LESS_HP",
+        "wring_out": "INCREASE_POWER_WITH_MORE_HP", "crush_grip": "INCREASE_POWER_WITH_MORE_HP",
+        "punishment": "INCREASE_POWER_WITH_MORE_STAT_UP", "stored_power": "POWER_BY_USER_STAT_UP",
+        "power_trip": "POWER_BY_USER_STAT_UP", "trump_card": "HIGHER_POWER_WHEN_LOW_PP",
+        "natural_gift": "NATURAL_GIFT", "fling": "FLING",
+        "eruption": "POWER_BY_USER_HP", "water_spout": "POWER_BY_USER_HP",
+        "facade": "DOUBLE_POWER_WHEN_STATUSED",
+        "revenge": "DOUBLE_POWER_IF_HIT", "avalanche": "DOUBLE_POWER_IF_HIT", "assurance": "DOUBLE_POWER_IF_HIT",
+        "payback": "DOUBLE_POWER_IF_MOVING_SECOND",
+        "venoshock": "DOUBLE_POWER_IF_TARGET_STATUSED", "hex": "DOUBLE_POWER_IF_TARGET_STATUSED",
+        "brine": "DOUBLE_POWER_WHEN_BELOW_HALF",
+        "smelling_salts": "DOUBLE_IF_TARGET_PARALYZED", "wake_up_slap": "DOUBLE_IF_TARGET_ASLEEP",
     }
     if s in named and named[s]:
         return named[s]

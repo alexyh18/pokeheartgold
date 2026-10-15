@@ -55,6 +55,8 @@ class FactoryAi(private val rng: BattleRandom) {
                 "COUNTER", "MIRROR_COAT", "METAL_BURST" -> s = 15
                 "ONE_HIT_KO" -> s = 25
                 "ALWAYS_FLINCH_FIRST_TURN_ONLY" -> s = if (m.turnsOnField == 0) s + 30 else -100
+                // Explosion/Self-Destruct: only worth it as a finishing blow (the user faints).
+                "USER_FAINTS" -> s = if (dmg >= t.hp && b.sides[m.side].alive() > 1) s / 2 else -40
                 "HIT_FIRST_IF_TARGET_ATTACKING" -> s -= 5
                 "HIT_LAST_WHIFF_IF_HIT" -> if (t.substituteHp == 0) s -= 30
                 "RECOVER_DAMAGE_SLEEP" -> if (t.status != Status.SLEEP) s = -100
