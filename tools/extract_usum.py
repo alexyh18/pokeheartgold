@@ -279,9 +279,12 @@ def main():
             used_abilities.add(norm(ma))
         mbase = [int(r["HP"]), int(r["Attack"]), int(r["Defense"]),
                  int(r["Speed"]), int(r["SpAttack"]), int(r["SpDefense"])]
+        # Resolve the Mega form's own PokeAPI id and download its sprite (fallback to base species sprite).
+        sprite_id = download_mega_sprite(r["Species"].strip())
         mega_by_species[ndex] = {
             "species": ndex, "stone": 0, "nameKo": "메가 " + ko_species.get(str(ndex), r["Species"].strip()),
             "types": mtypes, "base": mbase, "ability": ma_id if ma_id is not None else 0,
+            "sprite": sprite_id or ndex,
         }
 
     # ---------- sets (Pokemon-Table) ----------
@@ -502,6 +505,8 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "hi_jump_kick": "CRASH_ON_MISS", "high_jump_kick": "CRASH_ON_MISS", "jump_kick": "CRASH_ON_MISS",
         "sucker_punch": "HIT_FIRST_IF_TARGET_ATTACKING", "fake_out": "ALWAYS_FLINCH_FIRST_TURN_ONLY",
         "trick_room": "TRICK_ROOM", "tailwind": "TAILWIND", "stealth_rock": "STEALTH_ROCK",
+        "electric_terrain": "TERRAIN_ELECTRIC", "grassy_terrain": "TERRAIN_GRASSY",
+        "misty_terrain": "TERRAIN_MISTY", "psychic_terrain": "TERRAIN_PSYCHIC",
         "spikes": "SPIKES", "toxic_spikes": "TOXIC_SPIKES", "leech_seed": "LEECH_SEED",
         "will_o_wisp": "STATUS_BURN", "thunder_wave": "STATUS_PARALYZE", "toxic": "STATUS_TOXIC",
         "hidden_power": "RANDOM_POWER_BASED_ON_IVS", "weather_ball": "CHANGE_TYPE_WITH_WEATHER",
@@ -584,6 +589,26 @@ def build_trainers():
             "start": start, "end": end,
         })
     return trainers, cat_id
+
+
+def download_mega_sprite(species_name):
+    """Fetch the Mega form's PokeAPI id and download its Gen7 front/back sprite. Returns the id or None."""
+    slug = norm(species_name) + "-mega"
+    data = api_get("pokemon/%s" % slug)
+    if not data:
+        return None
+    fid = data.get("id")
+    spr = data.get("sprites", {})
+    versions = spr.get("versions", {})
+    g7 = versions.get("generation-vii", {}).get("ultra-sun-ultra-moon", {})
+    front = g7.get("front_default") or spr.get("front_default")
+    back = (versions.get("generation-v", {}).get("black-white", {}).get("back_default") or spr.get("back_default") or front)
+    icon = versions.get("generation-vii", {}).get("icons", {}).get("front_default") or front
+    if not download(front, os.path.join(OUT, "sprites", "front", "%d.png" % fid)):
+        return None
+    download(back, os.path.join(OUT, "sprites", "back", "%d.png" % fid))
+    download(icon, os.path.join(OUT, "sprites", "icon", "%d.png" % fid))
+    return fid
 
 
 def download_sprites(dexid):

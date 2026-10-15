@@ -84,6 +84,7 @@ class BattleSession(
     var message by mutableStateOf("")
     var mode by mutableStateOf(InputMode.NONE)
     var weather by mutableStateOf(Weather.NONE)
+    var terrain by mutableStateOf(com.usumfactory.engine.Terrain.NONE)
     /** Message/animation speed: 0 slow, 1 normal, 2 fast. */
     var speed by mutableIntStateOf(1)
     val fast get() = speed == 2
@@ -232,6 +233,7 @@ class BattleSession(
             }
             is BattleEvent.Hidden -> views[e.side].hidden = e.hidden
             is BattleEvent.WeatherChanged -> weather = e.weather
+            is BattleEvent.TerrainChanged -> terrain = e.terrain
             is BattleEvent.Substitute -> {
                 val v = views[e.side]
                 if (e.up) {

@@ -24,6 +24,7 @@ sealed interface BattleEvent {
     data class StatAnim(val side: Int, val up: Boolean) : BattleEvent
     data class Hidden(val side: Int, val hidden: Boolean) : BattleEvent
     data class WeatherChanged(val weather: Weather) : BattleEvent
+    data class TerrainChanged(val terrain: Terrain) : BattleEvent
     /** A substitute doll appeared (up = true) or broke (up = false) on [side]. */
     data class Substitute(val side: Int, val up: Boolean) : BattleEvent
     /** [side]'s Pokémon Mega-Evolved (sprite/name refresh + flash). */
@@ -72,6 +73,8 @@ class Battle(
 ) {
     var weather = Weather.NONE
     var weatherTurns = 0
+    var terrain = Terrain.NONE
+    var terrainTurns = 0
     var trickRoom = 0
     var gravityTurns = 0
     var turn = 0
@@ -155,7 +158,7 @@ class Battle(
             It.IRON_BALL -> r = chain(r, 0x800)
         }
         s = fixedRound(s, r)
-        if (m.status == Status.PARALYSIS && ability(m) != Ab.QUICK_FEET) s = s * 25 / 100
+        if (m.status == Status.PARALYSIS && ability(m) != Ab.QUICK_FEET) s = s * 50 / 100  // Gen 7: paralysis halves Speed
         s = s.coerceAtMost(10000)
         return s
     }
@@ -369,7 +372,8 @@ class Battle(
             val m = sides[side].mon
             if (a is Action.Switch) return Triple(7, 0, 0)
             val move = actionMove(m, a as Action.Fight)
-            val prio = move.priority
+            // Prankster (Gen7): the user's status moves get +1 priority (Dark targets are immune — handled at use).
+            val prio = move.priority + if (ability(m) == Ab.PRANKSTER && move.isStatus) 1 else 0
             val quick = if (item(m) == It.QUICK_CLAW && rng.chance(20)) 1 else 0
             if (quick == 1) quickClawUsed[side] = true
             var spe = speed(m)
@@ -408,20 +412,43 @@ class Battle(
             move = if (m.encoreMove != null) m.encoreMove!! else slot.move
             if (m.encoreMove != null) slot = m.moves.firstOrNull { it.move.id == move.id } ?: slot
         }
-        // Z-move: a matching Z-crystal turns one damaging move into a boosted Z-move (once per battle).
+        // Z-move: a matching Z-crystal turns one move into a Z-move (once per battle). A damaging Z-move
+        // gets a boosted power; a status Z-move keeps its normal effect and gains a Z-bonus.
+        val zStatus = a.zMove && canZMove(m, move) && move.isStatus
         if (a.zMove && canZMove(m, move)) {
             m.usedZ = true
-            m.zMoveActive = true
+            m.zMoveActive = !move.isStatus   // power override only for damaging Z-moves
             msg("${Josa.eunNeun(nm(m))} Z파워를 해방했다!")
             emit(BattleEvent.ZMove(m.side, move))
         }
         useMove(m, move, slot, fromAction = true, pursuitBoost = pursuitBoost)
         m.zMoveActive = false
+        if (zStatus && !m.fainted) zStatusBonus(m, move)
     }
 
-    /** A damaging move whose type matches the held Z-crystal, usable once per battle. */
+    /**
+     * The Z-bonus a status move grants when used as a Z-move (Gen 7). Most self-targeting buff moves get
+     * an extra +1 to their key stat; a few signature cases reset stats or heal. Target-only status moves
+     * get no extra on-target bonus here (their normal effect still applied).
+     */
+    private suspend fun zStatusBonus(m: BattleMon, move: MoveData) {
+        val stat = when (move.key) {
+            "agility", "rock_polish", "autotomize" -> Stat.SPE
+            "work_up", "swords_dance", "howl", "sharpen", "meditate" -> Stat.ATK
+            "defense_curl", "harden", "withdraw", "iron_defense", "cotton_guard" -> Stat.DEF
+            "nasty_plot", "charge_beam" -> Stat.SPA
+            "calm_mind" -> Stat.SPD
+            else -> -1
+        }
+        if (stat >= 0 && m.stages[stat] < 6) {
+            msg("${Josa.eunNeun(nm(m))} Z파워로 기운이 넘친다!")
+            changeStage(m, stat, 1, m)
+        }
+    }
+
+    /** A move (damaging or status) whose type matches the held Z-crystal, usable once per battle. */
     fun canZMove(m: BattleMon, move: MoveData): Boolean {
-        if (m.usedZ || move.isStatus) return false
+        if (m.usedZ) return false
         val zType = It.zCrystalType(m.item)
         return zType >= 0 && zType == moveType(m, move)
     }
@@ -546,6 +573,7 @@ class Battle(
         val prefix = if (m.side == 1) "상대 " else ""
         m.megaEvolved = true
         m.megaName = mega.nameKo
+        if (mega.sprite > 0) m.megaSprite = mega.sprite
         m.types = mega.types.toMutableList()
         val hp = m.stats[Stat.HP]
         m.stats = m.info.statsFor(mega.base).also { it[Stat.HP] = hp }
@@ -839,6 +867,11 @@ class Battle(
         }
         // ---- moves that need a target
         if (t.fainted) { msg("하지만 실패했다!"); return }
+        // Gen 7 Psychic Terrain: a grounded target is protected from priority moves.
+        val effPrio = move.priority + if (ability(m) == Ab.PRANKSTER && move.isStatus) 1 else 0
+        if (terrain == Terrain.PSYCHIC && effPrio > 0 && grounded(t) && m !== t) {
+            msg("${Josa.eunNeun(nm(t))} 사이코필드에 보호받고 있다!"); return
+        }
         if (e == "HIT_LAST_WHIFF_IF_HIT" && m.tookDamageThisTurn) {
             msg("${Josa.eunNeun(nm(m))} 집중이 흐트러져 기술을 쓸 수 없다!")
             return
@@ -1080,6 +1113,15 @@ class Battle(
         if (It.TYPE_BOOST[it] == type) r = chain(r, 0x1333)
         if (It.GEMS[it] == type) { r = chain(r, 0x1800); m.gemConsumedType = type }
         if (m.charged && type == Types.ELECTRIC) r = chain(r, 0x2000)
+        // Gen 7 terrain: ×1.5 for the matching type from a grounded user; Grassy halves ground-quake moves.
+        if (grounded(m)) when (terrain) {
+            Terrain.ELECTRIC -> if (type == Types.ELECTRIC) r = chain(r, 0x1800)
+            Terrain.GRASSY -> if (type == Types.GRASS) r = chain(r, 0x1800)
+            Terrain.PSYCHIC -> if (type == Types.PSYCHIC) r = chain(r, 0x1800)
+            else -> Unit
+        }
+        if (terrain == Terrain.GRASSY && move.key in setOf("earthquake", "magnitude", "bulldoze") && grounded(t)) r = chain(r, 0x800)
+        if (terrain == Terrain.MISTY && type == Types.DRAGON && grounded(t)) r = chain(r, 0x800)
         return maxOf(1, fixedRound(p, r))
     }
 
@@ -1097,13 +1139,14 @@ class Battle(
     private fun calcDamage(m: BattleMon, t: BattleMon, move: MoveData, type: Int, pursuitBoost: Boolean, forceCrit: Boolean? = null, roll: Int? = null): DamageResult {
         val eff = effectiveness(type, m, t)
         if (eff == 0) return DamageResult(0, false, 0)
-        // crits: stage = move stage + Focus/Super Luck/items, 1 in {16, 8, 4, 3, 2}
+        // Gen 7 crits: stage ladder 1 in {24, 8, 2, 1}; stage 3+ is a guaranteed crit.
         val critBlocked = defAbility(m, t) in setOf(Ab.BATTLE_ARMOR, Ab.SHELL_ARMOR)
         var stage = move.crit
         if (ability(m) == Ab.SUPER_LUCK) stage++
         if (m.focusEnergy) stage += 2
         if (item(m) in setOf(It.SCOPE_LENS, It.RAZOR_CLAW)) stage++
-        val crit = forceCrit ?: (!critBlocked && rng.next(intArrayOf(16, 8, 4, 3, 2)[stage.coerceIn(0, 4)]) == 0)
+        val critDen = intArrayOf(24, 8, 2, 1)[stage.coerceIn(0, 3)]
+        val crit = forceCrit ?: (!critBlocked && (critDen == 1 || rng.next(critDen) == 0))
         val power = movePower(m, t, move, type, pursuitBoost)
         // attack
         val physical = move.isPhysical
@@ -1151,7 +1194,7 @@ class Battle(
         val w = effWeather()
         if (w == Weather.SUN) { if (type == Types.FIRE) d = d * 3 / 2 else if (type == Types.WATER) d /= 2 }
         if (w == Weather.RAIN) { if (type == Types.WATER) d = d * 3 / 2 else if (type == Types.FIRE) d /= 2 }
-        if (crit) d *= 2
+        if (crit) d = d * 3 / 2  // Gen 6+ critical hit multiplier (1.5x)
         d = d * (roll ?: (100 - rng.next(16))) / 100
         if (type != Types.NULL && m.hasType(type)) d = fixedRound(d, if (a == Ab.ADAPTABILITY) 0x2000 else 0x1800)
         d = d * eff / 4
@@ -1614,6 +1657,10 @@ class Battle(
     // ------------------------------------------------------------------ status moves aimed at the foe
     private suspend fun statusMove(m: BattleMon, t: BattleMon, move: MoveData) {
         val e = move.effect
+        // Gen 7: Dark-type Pokémon are immune to status moves boosted by the user's Prankster.
+        if (ability(m) == Ab.PRANKSTER && t.hasType(Types.DARK) && m !== t) {
+            msg("${Josa.eunNeun(nm(t))} 짓궂은 마음의 영향을 받지 않는다!"); return
+        }
         val behindSub = t.substituteHp > 0 && !move.has("BYPASS_SUBSTITUTE") && !move.has("SOUND")
         val subBlocks = behindSub && e !in setOf("FORCE_SWITCH", "DISABLE", "ENCORE", "TAUNT", "TORMENT", "FORESIGHT", "INFATUATE", "PREVENT_ESCAPE", "DECREASE_LAST_MOVE_PP", "SWITCH_HELD_ITEMS", "SUPRESS_ABILITY", "AVERAGE_HP", "COPY_STAT_CHANGES", "ALL_FAINT_3_TURNS")
         if (subBlocks) { msg("하지만 실패했다!"); return }
@@ -1896,6 +1943,10 @@ class Battle(
             "WEATHER_RAIN" -> setWeather(Weather.RAIN, if (item(m) == It.DAMP_ROCK) 8 else 5, null)
             "WEATHER_SANDSTORM" -> setWeather(Weather.SAND, 5, null)
             "WEATHER_HAIL" -> setWeather(Weather.HAIL, if (item(m) == It.ICY_ROCK) 8 else 5, null)
+            "TERRAIN_ELECTRIC" -> setTerrain(Terrain.ELECTRIC, m)
+            "TERRAIN_GRASSY" -> setTerrain(Terrain.GRASSY, m)
+            "TERRAIN_MISTY" -> setTerrain(Terrain.MISTY, m)
+            "TERRAIN_PSYCHIC" -> setTerrain(Terrain.PSYCHIC, m)
             "TRICK_ROOM" -> {
                 if (trickRoom > 0) { trickRoom = 0; msg("뒤틀린 시공이 원래대로 되돌아왔다!") }
                 else { trickRoom = 5; msg("${Josa.iGa(nm(m))} 시공을 뒤틀었다!") }
@@ -2039,6 +2090,11 @@ class Battle(
         } || (a == Ab.LEAF_GUARD && effWeather() == Weather.SUN)
         if (blockedAbility) {
             if (!silentFail) { msg("${nm(t)}의 ${abName(a)}!"); msg("${Josa.eunNeun(nm(t))} 영향을 받지 않았다!") }
+            return false
+        }
+        // Gen 7 terrain: grounded Pokémon resist status (Misty = all, Electric = sleep only).
+        if (grounded(t) && (terrain == Terrain.MISTY || (terrain == Terrain.ELECTRIC && s == Status.SLEEP))) {
+            if (!silentFail) msg("${Josa.eunNeun(nm(t))} 필드의 보호를 받고 있다!")
             return false
         }
         val typeImmune = when (s) {
@@ -2207,6 +2263,20 @@ class Battle(
         })
     }
 
+    private suspend fun setTerrain(terr: Terrain, user: BattleMon) {
+        if (terrain == terr) { msg("하지만 실패했다!"); return }
+        terrain = terr
+        terrainTurns = 5
+        emit(BattleEvent.TerrainChanged(terr))
+        msg(when (terr) {
+            Terrain.ELECTRIC -> "발밑에 전기가 흐르기 시작했다!"
+            Terrain.GRASSY -> "발밑에 풀이 무성해졌다!"
+            Terrain.MISTY -> "발밑에 안개가 자욱해졌다!"
+            Terrain.PSYCHIC -> "발밑이 이상한 느낌으로 가득해졌다!"
+            Terrain.NONE -> ""
+        })
+    }
+
     // ------------------------------------------------------------------ end of turn (Gen 5 order, simplified)
     private suspend fun endOfTurn() {
         val order = bySpeed(listOf(sides[0].mon, sides[1].mon))
@@ -2248,6 +2318,22 @@ class Battle(
                     }
                     if (m.fainted) faint(m)
                 }
+            }
+        }
+        // Terrain: Grassy Terrain heals grounded Pokémon, then the terrain counts down.
+        if (terrain != Terrain.NONE) {
+            if (terrain == Terrain.GRASSY) {
+                for (m in order) if (!m.fainted && grounded(m) && m.hp < m.maxHp) {
+                    heal(m, maxOf(1, m.maxHp / 16)); msg("${Josa.eunNeun(nm(m))} 그래스필드로 체력을 회복했다!")
+                }
+            }
+            if (terrainTurns > 0 && --terrainTurns == 0) {
+                msg(when (terrain) {
+                    Terrain.ELECTRIC -> "발밑의 전기가 사라졌다!"; Terrain.GRASSY -> "발밑의 풀이 사라졌다!"
+                    Terrain.MISTY -> "발밑의 안개가 걷혔다!"; Terrain.PSYCHIC -> "발밑의 이상한 느낌이 사라졌다!"; else -> ""
+                })
+                terrain = Terrain.NONE
+                emit(BattleEvent.TerrainChanged(terrain))
             }
         }
         // Future Sight

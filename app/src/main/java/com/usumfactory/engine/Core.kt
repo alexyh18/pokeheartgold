@@ -39,7 +39,7 @@ object Types {
         intArrayOf(4,  4,  0,  8,  4,  8,  2,  4,  8,  8,  4,  2,  8,  4,  4,  4,  4,  4), // Ground
         intArrayOf(4,  2,  8,  4,  2,  4,  8,  4,  2,  8,  4,  4,  4,  4,  8,  4,  4,  4), // Rock
         intArrayOf(4,  2,  2,  2,  4,  4,  4,  2,  2,  2,  4,  8,  4,  8,  4,  4,  8,  2), // Bug
-        intArrayOf(0,  4,  4,  4,  4,  4,  4,  8,  2,  4,  4,  4,  4,  8,  4,  4,  2,  4), // Ghost
+        intArrayOf(0,  4,  4,  4,  4,  4,  4,  8,  4,  4,  4,  4,  4,  8,  4,  4,  2,  4), // Ghost (Gen6: no longer resisted by Steel)
         intArrayOf(4,  4,  4,  4,  4,  8,  4,  4,  2,  2,  2,  4,  2,  4,  8,  4,  4,  8), // Steel
         intArrayOf(4,  4,  4,  4,  4,  2,  8,  4,  8,  2,  2,  8,  4,  4,  8,  2,  4,  4), // Fire
         intArrayOf(4,  4,  4,  4,  8,  8,  4,  4,  4,  8,  2,  2,  4,  4,  4,  2,  4,  4), // Water
@@ -48,7 +48,7 @@ object Types {
         intArrayOf(4,  8,  4,  8,  4,  4,  4,  4,  2,  4,  4,  4,  4,  2,  4,  4,  0,  4), // Psychic
         intArrayOf(4,  4,  8,  4,  8,  4,  4,  4,  2,  2,  2,  8,  4,  4,  2,  8,  4,  4), // Ice
         intArrayOf(4,  4,  4,  4,  4,  4,  4,  4,  2,  4,  4,  4,  4,  4,  4,  8,  4,  0), // Dragon
-        intArrayOf(4,  2,  4,  4,  4,  4,  4,  8,  2,  4,  4,  4,  4,  8,  4,  4,  2,  2), // Dark
+        intArrayOf(4,  2,  4,  4,  4,  4,  4,  8,  4,  4,  4,  4,  4,  8,  4,  4,  2,  2), // Dark (Gen6: no longer resisted by Steel)
         intArrayOf(4,  8,  4,  2,  4,  4,  4,  4,  2,  2,  4,  4,  4,  4,  4,  8,  8,  4), // Fairy
     )
 
@@ -76,6 +76,9 @@ object Stat {
 }
 
 enum class Status { NONE, SLEEP, POISON, TOXIC, BURN, FREEZE, PARALYSIS }
+
+/** Gen 7 terrain, affecting only grounded Pokémon; set by the terrain moves, lasts 5 turns. */
+enum class Terrain { NONE, ELECTRIC, GRASSY, MISTY, PSYCHIC }
 
 /** HGSS LCRandom: seed = seed * 0x41C64E6D + 0x6073, returns the high 16 bits. Used for Factory generation. */
 class LcRandom(var seed: Long) {

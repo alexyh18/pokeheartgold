@@ -86,6 +86,8 @@ data class MegaForme(
     val types: List<Int>,
     val base: List<Int>,
     val ability: Int,
+    /** Sprite id to draw while mega-evolved (its own PokeAPI form id); falls back to [species]. */
+    val sprite: Int = 0,
 )
 
 @Serializable

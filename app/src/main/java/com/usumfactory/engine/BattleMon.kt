@@ -59,8 +59,15 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     /** True while the current move is being unleashed as a Z-move (power override; cleared after use). */
     var zMoveActive = false
 
-    /** The species id the UI should draw (illusion disguise takes priority). */
-    val displaySpecies: Int get() = if (illusionSpecies >= 0) illusionSpecies else species.id
+    /** Sprite id to draw while mega-evolved (the mega form's own art), or -1 if not mega. */
+    var megaSprite: Int = -1
+
+    /** The species id the UI should draw (illusion disguise > mega sprite > real species). */
+    val displaySpecies: Int get() = when {
+        illusionSpecies >= 0 -> illusionSpecies
+        megaSprite >= 0 -> megaSprite
+        else -> species.id
+    }
     /** The name the UI/messages should show (illusion disguise, else mega name, else real name). */
     val displayName: String get() = illusionName ?: megaName ?: species.nameKo
     val fainted get() = hp <= 0
@@ -163,6 +170,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         // types reset above, stats below from baseStats, ability from baseAbility).
         if (megaName != null) {
             megaName = null
+            megaSprite = -1
             stats = baseStats.copyOf()
         }
         ability = baseAbility
