@@ -128,7 +128,17 @@ object Ab {
     const val SAND_FORCE = 159
     const val IRON_BARBS = 160
     const val ZEN_MODE = 161  // Darmanitan: flips to the Zen forme while HP <= 1/2.
+    // "-ate" / skin abilities: a Normal-type move becomes the ability's type and gains x1.2 power (Gen 7).
+    const val REFRIGERATE = 174  // 프리즈스킨: Normal -> Ice
+    const val PIXILATE = 182     // 페어리스킨: Normal -> Fairy
+    const val AERILATE = 184     // 스카이스킨: Normal -> Flying
+    const val GALVANIZE = 206    // 일렉트릭스킨: Normal -> Electric
     const val DISGUISE = 209  // Mimikyu: nullifies the first damaging hit, then busts.
+
+    /** Normal-type move -> this type for the "-ate"/skin ability. */
+    val ATE_TYPE = mapOf(
+        REFRIGERATE to 14 /*Ice*/, PIXILATE to 17 /*Fairy*/, AERILATE to 2 /*Flying*/, GALVANIZE to 12 /*Electric*/,
+    )
 
     /** Abilities Mold Breaker ignores (ones that react to an incoming move). */
     val BREAKABLE = setOf(

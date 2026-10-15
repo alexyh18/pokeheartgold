@@ -490,7 +490,8 @@ private fun FightMenu(vm: GameViewModel, s: BattleSession) {
     var megaOn by remember(m) { mutableStateOf(false) }
     var zOn by remember(m) { mutableStateOf(false) }
     val canMega = s.battle.canMega(m)
-    val canZAny = !m.usedZ && com.usumfactory.engine.It.zCrystalType(s.battle.item(m)) >= 0
+    // Z-moves are once per battle per trainer: hide the toggle once anyone on the team has used it.
+    val canZAny = !m.usedZ && !s.player.usedZ && com.usumfactory.engine.It.zCrystalType(s.battle.item(m)) >= 0
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (canMega || canZAny) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

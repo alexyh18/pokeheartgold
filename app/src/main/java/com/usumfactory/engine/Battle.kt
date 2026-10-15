@@ -55,6 +55,9 @@ class Side(val index: Int, val party: List<BattleMon>, val trainerLabel: String)
     var futureSightTurns = 0
     var futureSightUser: BattleMon? = null
     var futureSightMove: MoveData? = null
+    /** Mega Evolution and Z-moves are each limited to once per battle per trainer (this side). */
+    var usedMega = false
+    var usedZ = false
     fun switchTargets() = party.indices.filter { it != active && !party[it].fainted }
     fun alive() = party.count { !it.fainted }
 }
@@ -242,6 +245,13 @@ class Battle(
             "RANDOM_POWER_BASED_ON_IVS" -> return user.hiddenPowerType
             // Natural Gift: type comes from the held berry (Normal + fails if no berry).
             "NATURAL_GIFT" -> return naturalGift(item(user))?.first ?: Types.NORMAL
+        }
+        // "-ate"/skin abilities (Aerilate/Pixilate/Refrigerate/Galvanize) turn a Normal-type move into
+        // the ability's type. The matching 1.2x power boost is applied in movePower(). Moves whose type
+        // is derived elsewhere (handled by the when above) already returned, so this only affects true
+        // Normal-type moves.
+        if (move.type == Types.NORMAL && !move.isStatus) {
+            Ab.ATE_TYPE[ability(user)]?.let { return it }
         }
         return move.type
     }
@@ -433,6 +443,7 @@ class Battle(
         val zStatus = a.zMove && canZMove(m, move) && move.isStatus
         if (a.zMove && canZMove(m, move)) {
             m.usedZ = true
+            sideOf(m).usedZ = true           // one Z-move per battle per trainer
             m.zMoveActive = !move.isStatus   // power override only for damaging Z-moves
             m.zMoveNameActive = true         // name override for both damaging and status Z-moves
             msg("${Josa.eunNeun(nm(m))} Z파워를 해방했다!")
@@ -506,7 +517,7 @@ class Battle(
 
     /** A move (damaging or status) whose type matches the held Z-crystal, usable once per battle. */
     fun canZMove(m: BattleMon, move: MoveData): Boolean {
-        if (m.usedZ) return false
+        if (m.usedZ || sideOf(m).usedZ) return false   // one Z-move per battle per trainer
         val zType = It.zCrystalType(m.item)
         return zType >= 0 && zType == moveType(m, move)
     }
@@ -620,6 +631,7 @@ class Battle(
     /** Whether [m] can Mega-Evolve now: holds the matching Mega Stone and hasn't done so this battle. */
     fun canMega(m: BattleMon): Boolean {
         if (m.megaEvolved) return false
+        if (sideOf(m).usedMega) return false   // one Mega Evolution per battle per trainer
         val mega = data.megasByStone[m.item] ?: return false
         return mega.species == m.species.id
     }
@@ -629,6 +641,7 @@ class Battle(
         if (!canMega(m)) return
         val mega = data.megasByStone[m.item] ?: return
         val prefix = if (m.side == 1) "상대 " else ""
+        sideOf(m).usedMega = true
         m.megaEvolved = true
         m.megaName = mega.nameKo
         if (mega.sprite > 0) m.megaSprite = mega.sprite
@@ -1207,6 +1220,9 @@ class Battle(
         }
         var r = 0x1000
         val a = ability(m)
+        // "-ate"/skin abilities: a move that was Normal-type gets a 1.2x boost (the type change itself
+        // is applied in moveType). 0x1333/0x1000 ≈ 1.2.
+        if (move.type == Types.NORMAL && !move.isStatus && Ab.ATE_TYPE.containsKey(a)) r = chain(r, 0x1333)
         if (a == Ab.TECHNICIAN && p <= 60) r = chain(r, 0x1800)
         if (a == Ab.RIVALRY && m.gender != 2 && t.gender != 2) r = chain(r, if (m.gender == t.gender) 0x1400 else 0xC00)
         if (a == Ab.IRON_FIST && move.has("PUNCH")) r = chain(r, 0x1333)

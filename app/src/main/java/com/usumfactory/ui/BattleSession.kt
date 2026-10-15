@@ -251,9 +251,12 @@ class BattleSession(
                 }
             }
             is BattleEvent.MegaEvolve -> {
-                // Flash + refresh: the sprite reads v.mon.displaySpecies (unchanged here, base sprite),
-                // the HUD name reads displayName which now returns the Mega name.
+                // Flash + refresh. The nameplate (HpBox) reads v.statusTick, so bumping it invalidates
+                // the composable and forces it to re-read m.displayName — which now returns the Mega
+                // name and the Mega sprite (m.displaySpecies). Without this bump the name/sprite would
+                // not update, because BattleMon is a plain (non-observable) object.
                 val v = views[e.side]
+                v.statusTick++
                 v.flashUp = true
                 v.lunge.snapTo(0f)
                 v.lunge.animateTo(1f, (160 * animScale).toInt().coerceAtLeast(1))
