@@ -58,6 +58,9 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var usedZ = false
     /** True while the current move is being unleashed as a Z-move (power override; cleared after use). */
     var zMoveActive = false
+    /** True while the current move is being announced/used as a Z-move (name override; cleared after use).
+     *  Set for both damaging and status Z-moves so the UI can show the Z-move's display name. */
+    var zMoveNameActive = false
 
     /** Sprite id to draw while mega-evolved (the mega form's own art), or -1 if not mega. */
     var megaSprite: Int = -1

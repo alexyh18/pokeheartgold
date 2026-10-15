@@ -90,6 +90,17 @@ class Battle(
     // Uses displayName so an Illusion (일루전) shows its disguise in every battle message.
     fun nm(m: BattleMon) = if (m.side == 1) "상대 ${m.displayName}" else m.displayName
     private fun mvName(m: MoveData) = m.nameKo
+    /**
+     * The move's display name, substituting the Gen 7 Z-move name while [user] is unleashing it as a
+     * Z-move. Damaging Z-moves become their type's Z-move (e.g. 불꽃 → 다이내믹풀플레임); status Z-moves
+     * keep their own name, matching the games.
+     */
+    private fun mvName(user: BattleMon, move: MoveData): String {
+        if (user.zMoveNameActive && !move.isStatus) {
+            data.zMoveNameByType[moveType(user, move)]?.let { return it }
+        }
+        return move.nameKo
+    }
     private fun itName(i: Int) = data.itemName(i)
     private fun abName(a: Int) = data.abilityName(a)
 
@@ -418,11 +429,13 @@ class Battle(
         if (a.zMove && canZMove(m, move)) {
             m.usedZ = true
             m.zMoveActive = !move.isStatus   // power override only for damaging Z-moves
+            m.zMoveNameActive = true         // name override for both damaging and status Z-moves
             msg("${Josa.eunNeun(nm(m))} Z파워를 해방했다!")
             emit(BattleEvent.ZMove(m.side, move))
         }
         useMove(m, move, slot, fromAction = true, pursuitBoost = pursuitBoost)
         m.zMoveActive = false
+        m.zMoveNameActive = false
         if (zStatus && !m.fainted) zStatusBonus(m, move)
     }
 
@@ -937,7 +950,7 @@ class Battle(
                 emit(BattleEvent.Hidden(m.side, false))
             }
         }
-        msg("${nm(m)}의 ${mvName(move)}!")
+        msg("${nm(m)}의 ${mvName(m, move)}!")
         emit(BattleEvent.UseMove(m.side, move))
         if (!secondTurn) recordMove(m, move)
 

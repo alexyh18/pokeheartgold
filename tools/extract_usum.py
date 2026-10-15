@@ -234,6 +234,29 @@ def build_types():
     return out
 
 
+def build_zmove_names():
+    """Korean display names for the 18 type-based damaging Z-moves, keyed by engine type id.
+
+    The PokeAPI dump lists each type's Z-move twice (physical=even id, special=odd id, ids 622-657);
+    both share the same display name, so we keep the first one seen per type.
+    """
+    mrows = {r["id"]: r for r in dict_rows(os.path.join(CACHE, "moves.csv"))}
+    ko_mv = ko_names("move_names", "move_id")
+    out = {}
+    for mid in range(622, 658):
+        r = mrows.get(str(mid))
+        if not r:
+            continue
+        eid = POKEAPI_TYPE.get(int(r["type_id"]))
+        if eid is None or eid in out:
+            continue
+        name = ko_mv.get(str(mid))
+        if name:
+            out[eid] = name
+    # Emit a stable, type-ordered list the engine can index by type id.
+    return [{"type": eid, "nameKo": out[eid]} for eid in sorted(out)]
+
+
 def resolve_form(slug, set_name, species_out, species_dex, used_abilities):
     """Resolve an alternate form to a species id, adding a species entry + pixel sprite if new.
     Base-form slugs (no dash) just reuse the existing base dex entry."""
@@ -461,8 +484,14 @@ def main():
             })
             download_pixel_sprites(zdata["id"])
 
+    # Type-based Z-move display names (Gen 7). A damaging move used as a Z-move is announced under the
+    # name of its type's Z-move (e.g. Fire -> 다이내믹풀플레임). Built from the PokeAPI CSV dumps so it
+    # needs no network access. Z-move entries occupy ids 622-657 (physical/even, special/odd per type).
+    zmoves_out = build_zmove_names()
+
     print("sets:", len(sets), "mega sets kept:", sum(1 for s in sets if s["form"] == 1),
-          "mega formes:", len(megas_out), "zen:", len(zen_out), "z-crystals:", len(used_z), "species in pool:", len(species_set_ids))
+          "mega formes:", len(megas_out), "zen:", len(zen_out), "z-crystals:", len(used_z),
+          "z-move names:", len(zmoves_out), "species in pool:", len(species_set_ids))
     if unknown:
         print("UNRESOLVED (first 20):", sorted(unknown)[:20])
 
@@ -523,6 +552,7 @@ def main():
     write("data/trainers.json", trainers_out)
     write("data/megas.json", megas_out)
     write("data/zen.json", zen_out)
+    write("data/zmoves.json", zmoves_out)
     print("DONE. species=%d moves=%d items=%d abilities=%d sets=%d trainers=%d megas=%d" % (
         len(species_set_ids), len(moves_out), len(items_out), len(abil_out), len(sets), len(trainers_out), len(megas_out)))
 
@@ -655,6 +685,9 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "venoshock": "DOUBLE_POWER_IF_TARGET_STATUSED", "hex": "DOUBLE_POWER_IF_TARGET_STATUSED",
         "brine": "DOUBLE_POWER_WHEN_BELOW_HALF",
         "smelling_salts": "DOUBLE_IF_TARGET_PARALYZED", "wake_up_slap": "DOUBLE_IF_TARGET_ASLEEP",
+        # Dream Eater only works on a sleeping target (and drains HP); PokeAPI tags it as a drain move,
+        # which made it hit any target. RECOVER_DAMAGE_SLEEP gates it on the target being asleep.
+        "dream_eater": "RECOVER_DAMAGE_SLEEP",
     }
     if s in named and named[s]:
         return named[s]

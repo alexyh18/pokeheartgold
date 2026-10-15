@@ -103,6 +103,10 @@ data class ZenForme(
     val sprite: Int = 0,
 )
 
+/** Korean display name for a type's damaging Z-move (Gen 7), keyed by engine type id. */
+@Serializable
+data class ZMoveName(val type: Int, val nameKo: String)
+
 @Serializable
 data class TypeData(val id: Int, val key: String, val nameKo: String)
 
@@ -148,12 +152,15 @@ class GameData(
     val trainers: List<TrainerData>,
     megas: List<MegaForme> = emptyList(),
     zenFormes: List<ZenForme> = emptyList(),
+    zMoveNames: List<ZMoveName> = emptyList(),
 ) {
     val species = species.associateBy { it.id }
     /** Mega formes keyed by the Mega Stone item id that triggers them. */
     val megasByStone = megas.associateBy { it.stone }
     /** HP-triggered formes (Zen Mode) keyed by base species id. */
     val zenBySpecies = zenFormes.associateBy { it.species }
+    /** Damaging Z-move display name keyed by engine type id (Gen 7 type-based Z-moves). */
+    val zMoveNameByType = zMoveNames.associate { it.type to it.nameKo }
     val moves = moves.associateBy { it.id }
     val movesByKey = moves.associateBy { it.key }
     val items = items.associateBy { it.id }
@@ -201,6 +208,7 @@ class GameData(
             json.decodeFromString(read("data/trainers.json")),
             runCatching { json.decodeFromString<List<MegaForme>>(read("data/megas.json")) }.getOrDefault(emptyList()),
             runCatching { json.decodeFromString<List<ZenForme>>(read("data/zen.json")) }.getOrDefault(emptyList()),
+            runCatching { json.decodeFromString<List<ZMoveName>>(read("data/zmoves.json")) }.getOrDefault(emptyList()),
         )
     }
 }
