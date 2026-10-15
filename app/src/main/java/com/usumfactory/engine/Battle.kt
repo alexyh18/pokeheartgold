@@ -1037,6 +1037,10 @@ class Battle(
         }
         val mtype = moveType(m, move)
         if (absorbed(m, t, move, mtype)) return
+        // Gen 7: Sheer Cold (절대영도) has no effect on Ice-type Pokémon, regardless of the accuracy roll.
+        if (move.key == "sheer_cold" && t.hasType(Types.ICE)) {
+            msg("${nm(t)}에게는 효과가 없는 것 같다…"); return
+        }
         if (!accuracyCheck(m, t, move)) {
             msg("${nm(t)}에게는 맞지 않았다!")
             missed(m, move)
@@ -1357,7 +1361,8 @@ class Battle(
     fun estimateDamage(m: BattleMon, t: BattleMon, move: MoveData): Int {
         if (move.isStatus) return 0
         val type = moveType(m, move)
-        if (move.effect == "ONE_HIT_KO") return if (effectiveness(type, m, t) == 0 || defAbility(m, t) == Ab.STURDY) 0 else t.hp * 30 / 100
+        if (move.effect == "ONE_HIT_KO") return if (effectiveness(type, m, t) == 0 || defAbility(m, t) == Ab.STURDY ||
+            (move.key == "sheer_cold" && t.hasType(Types.ICE))) 0 else t.hp * 30 / 100
         if (move.effect == "LEVEL_DAMAGE_FLAT") return if (effectiveness(type, m, t) == 0) 0 else m.level
         if (move.effect == "RANDOM_DAMAGE_1_TO_150_LEVEL") return if (effectiveness(type, m, t) == 0) 0 else m.level
         if (move.effect == "HALVE_HP") return t.hp / 2
