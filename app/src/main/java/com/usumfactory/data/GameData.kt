@@ -56,7 +56,10 @@ data class MoveData(
     val isStatus get() = category == "STATUS"
     fun has(flag: String) = flag in flags
     val targetsSelf get() = target == "USER" || target == "USER_SIDE" || target == "USER_OR_ALLY"
-    val targetsField get() = target == "FIELD" || target == "FOE_SIDE" || target == "ALL"
+    // A damaging "ALL"/"ALL_FOES" move is a spread attack (it still hits the foe in a single battle);
+    // only a STATUS move with these targets is a true field/side effect (Haze, weather, terrain…).
+    val targetsField get() = target == "FIELD" || target == "FOE_SIDE" ||
+        ((target == "ALL" || target == "ALL_FOES") && isStatus)
 }
 
 @Serializable

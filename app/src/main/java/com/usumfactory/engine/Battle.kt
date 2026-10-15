@@ -1356,6 +1356,19 @@ class Battle(
             }
             return 0
         }
+        // Mimikyu's Disguise: the first damaging hit is nullified; it busts and loses 1/8 of max HP (Gen 7).
+        if (defAbility(m, t) == Ab.DISGUISE && !t.busted && m !== t && !move.isStatus) {
+            emit(BattleEvent.Hit(t.side, eff))
+            if (crit) msg("급소에 맞았다!")
+            msg("${nm(t)}의 탈이 공격을 막아냈다!")
+            t.busted = true
+            damage(t, maxOf(1, t.maxHp / 8))
+            msg("${Josa.eunNeun(nm(t))} 탈이 벗겨졌다!")
+            emit(BattleEvent.SendOut(t.side, t))  // refresh sprite to Busted form
+            t.lastHitBy = m
+            if (!t.fainted) hpTriggers(t)
+            return 0
+        }
         var d = minOf(dmg, t.hp)
         var survived: String? = null
         if (d >= t.hp) {

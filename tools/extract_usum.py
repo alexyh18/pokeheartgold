@@ -94,14 +94,31 @@ Z_CRYSTALS = {
 
 # Data-file typos / Gen7-form names that must map to a base species or canonical slug.
 ABILITY_ALIAS = {"telepahty": "telepathy"}
-# Alternate-form set names -> base species name present in the Pokedex TSV. Forms reuse the base
-# species' dex id, stats and sprite (a v1 simplification; Rotom/Oricorio form typings aren't modeled).
-FORM_TO_BASE = {
-    "Lycanroc (Midday Form)": "Lycanroc", "Lycanroc (Midnight Form)": "Lycanroc",
-    "Oricorio (Baile Style)": "Oricorio", "Oricorio (Pa'u Style)": "Oricorio",
-    "Oricorio (Pom-Pom Style)": "Oricorio", "Oricorio (Sensu Style)": "Oricorio",
-    "Rotom (Fan Rotom)": "Rotom", "Rotom (Frost Rotom)": "Rotom", "Rotom (Heat Rotom)": "Rotom",
-    "Rotom (Mow Rotom)": "Rotom", "Rotom (Wash Rotom)": "Rotom",
+# Alternate-form set names -> PokeAPI form slug. Each becomes its OWN species entry (real types/stats/
+# abilities/sprite from PokeAPI), so forms play correctly instead of as the base species. The Midday
+# Lycanroc is the base species (745); the others are distinct PokeAPI forms with ids in the 10xxx range.
+FORM_SETS = {
+    "Lycanroc (Midday Form)": "lycanroc-midday",  # dex 745
+    "Lycanroc (Midnight Form)": "lycanroc-midnight",
+    "Oricorio (Baile Style)": "oricorio-baile",  # dex 741
+    "Oricorio (Pa'u Style)": "oricorio-pau",
+    "Oricorio (Pom-Pom Style)": "oricorio-pom-pom",
+    "Oricorio (Sensu Style)": "oricorio-sensu",
+    "Rotom (Heat Rotom)": "rotom-heat", "Rotom (Wash Rotom)": "rotom-wash",
+    "Rotom (Frost Rotom)": "rotom-frost", "Rotom (Fan Rotom)": "rotom-fan", "Rotom (Mow Rotom)": "rotom-mow",
+    "Ninetales (Alola Form)": "ninetales-alola", "Raichu (Alola Form)": "raichu-alola",
+    "Sandslash (Alola Form)": "sandslash-alola", "Golem (Alola Form)": "golem-alola",
+    "Muk (Alola Form)": "muk-alola", "Dugtrio (Alola Form)": "dugtrio-alola",
+    "Exeggutor (Alola Form)": "exeggutor-alola", "Marowak (Alola Form)": "marowak-alola",
+}
+# Korean names for the forms (the PokeAPI species name is the base; forms share it, so label them).
+FORM_NAME_KO = {
+    "lycanroc-midnight": "루가루암(한밤)", "oricorio-pau": "춤추새(파우파우)", "oricorio-pompom": "춤추새(파파라차)",
+    "oricorio-sensu": "춤추새(마이마이)", "rotom-heat": "로토무(히트)", "rotom-wash": "로토무(워시)",
+    "rotom-frost": "로토무(프로스트)", "rotom-fan": "로토무(스핀)", "rotom-mow": "로토무(커트)",
+    "ninetales-alola": "나인테일(알로라)", "raichu-alola": "라이츄(알로라)", "sandslash-alola": "고지(알로라)",
+    "golem-alola": "폭타(알로라)", "muk-alola": "질퍽이(알로라)", "dugtrio-alola": "닥트리오(알로라)",
+    "exeggutor-alola": "나시(알로라)", "marowak-alola": "텅구리(알로라)",
 }
 
 
@@ -190,6 +207,50 @@ def build_types():
     return out
 
 
+def resolve_form(slug, set_name, species_out, species_dex, used_abilities):
+    """Resolve an alternate form to a species id, adding a species entry + pixel sprite if new.
+    Base-form slugs (no dash) just reuse the existing base dex entry."""
+    data = api_get("pokemon/%s" % slug)
+    if not data:
+        return None
+    fid = data["id"]  # national dex for base forms, 10xxx for alternate forms
+    if fid in species_out:
+        return fid
+    # types
+    types = []
+    for t in sorted(data["types"], key=lambda x: x["slot"]):
+        tname = t["type"]["name"].capitalize()
+        if tname in TYPE_ID:
+            types.append(TYPE_ID[tname])
+    # base stats -> engine order HP,Atk,Def,Spe,SpA,SpD
+    bs = {s["stat"]["name"]: s["base_stat"] for s in data["stats"]}
+    base = [bs.get("hp", 1), bs.get("attack", 1), bs.get("defense", 1), bs.get("speed", 1),
+            bs.get("special-attack", 1), bs.get("special-defense", 1)]
+    # abilities
+    abil = []
+    for a in data.get("abilities", []):
+        aid = ABILITIES_CSV.get(a["ability"]["name"])
+        if aid is not None:
+            abil.append(aid); used_abilities.add(a["ability"]["name"])
+    abil = list(dict.fromkeys(abil))
+    weight = int(data.get("weight", 0))  # PokeAPI weight is already in 0.1 kg (hectograms)
+    nameKo = FORM_NAME_KO.get(slug) or species_out.get(fid, {}).get("nameKo") or slug
+    # gender ratio: inherit the base species' value if we have it, else default to 1:1 (127)
+    base_dex = data.get("species", {}).get("url", "").rstrip("/").rsplit("/", 1)[-1]
+    gr = species_out.get(int(base_dex) if base_dex.isdigit() else -1, {}).get("genderRatio", 127)
+    species_out[fid] = {
+        "id": fid, "name": slug, "nameKo": nameKo, "types": types, "base": base,
+        "abilities": abil, "weight": weight, "genderRatio": gr,
+        "final": True,  # forms don't evolve further in-battle
+    }
+    download_pixel_sprites(fid)
+    return fid
+
+
+# Resolved once in main() and shared with resolve_form.
+ABILITIES_CSV = {}
+
+
 def main():
     print("Reading Tree-Sets data from", TREE)
     # ---------- species (Pokedex TSV) ----------
@@ -197,6 +258,7 @@ def main():
     ko_species = ko_names("pokemon_species_names", "pokemon_species_id")
     ko_ability = ko_names("ability_names", "ability_id")
     abilities_csv = {r["identifier"]: int(r["id"]) for r in dict_rows(os.path.join(CACHE, "abilities.csv"))}
+    ABILITIES_CSV.update(abilities_csv)  # shared with resolve_form()
 
     # Pre-evolution map: a species is NOT final if it is some other species' Pre-Evolution.
     pre_evos = set()
@@ -308,10 +370,15 @@ def main():
         if name:
             cur = name
         is_mega = row[1].strip().lower() == "mega"
-        resolved = FORM_TO_BASE.get(cur, cur)
-        if resolved not in species_dex:
+        if cur in FORM_SETS:
+            # A named alternate form: resolve (and cache) its own species entry; sets reference its id.
+            dexid = resolve_form(FORM_SETS[cur], cur, species_out, species_dex, used_abilities)
+            if dexid is None:
+                unknown.add(cur); continue
+        elif cur in species_dex:
+            dexid = species_dex[cur]
+        else:
             unknown.add(cur); continue
-        dexid = species_dex[resolved]
         nature_name = row[2].strip()
         nid = nature_eid.get(nature_name, 0)
         item_name = row[3].strip()
@@ -396,6 +463,9 @@ def main():
     for dexid in sorted(species_set_ids):
         if download_sprites(dexid):
             got += 1
+    # Mimikyu's Busted form sprite (shown after its Disguise breaks), if Mimikyu is in the pool.
+    if 778 in species_set_ids:
+        download_pixel_sprites(10143)
     print("sprite sets fetched:", got)
 
     # ---------- write ----------
@@ -591,43 +661,43 @@ def build_trainers():
     return trainers, cat_id
 
 
+def _pixel_urls(spr):
+    """Static PIXEL sprites: default 2D front/back art; Gen7 pixel icon; BW fallbacks. All .png."""
+    versions = spr.get("versions", {})
+    bw = versions.get("generation-v", {}).get("black-white", {})
+    icons = versions.get("generation-vii", {}).get("icons", {})
+    front = spr.get("front_default") or bw.get("front_default")
+    back = spr.get("back_default") or bw.get("back_default") or front
+    icon = icons.get("front_default") or front
+    return front, back, icon
+
+
+def _save_sprites(fid, spr):
+    front, back, icon = _pixel_urls(spr)
+    ok = download(front, os.path.join(OUT, "sprites", "front", "%d.png" % fid))
+    download(back, os.path.join(OUT, "sprites", "back", "%d.png" % fid))
+    download(icon, os.path.join(OUT, "sprites", "icon", "%d.png" % fid))
+    return ok
+
+
+def download_pixel_sprites(fid):
+    data = api_get("pokemon/%d" % fid)
+    return _save_sprites(fid, data.get("sprites", {})) if data else False
+
+
 def download_mega_sprite(species_name):
-    """Fetch the Mega form's PokeAPI id and download its Gen7 front/back sprite. Returns the id or None."""
-    slug = norm(species_name) + "-mega"
-    data = api_get("pokemon/%s" % slug)
+    """Fetch the Mega form's PokeAPI id and download its static pixel sprite. Returns the id or None."""
+    data = api_get("pokemon/%s" % (norm(species_name) + "-mega"))
     if not data:
         return None
     fid = data.get("id")
-    spr = data.get("sprites", {})
-    versions = spr.get("versions", {})
-    g7 = versions.get("generation-vii", {}).get("ultra-sun-ultra-moon", {})
-    front = g7.get("front_default") or spr.get("front_default")
-    back = (versions.get("generation-v", {}).get("black-white", {}).get("back_default") or spr.get("back_default") or front)
-    icon = versions.get("generation-vii", {}).get("icons", {}).get("front_default") or front
-    if not download(front, os.path.join(OUT, "sprites", "front", "%d.png" % fid)):
-        return None
-    download(back, os.path.join(OUT, "sprites", "back", "%d.png" % fid))
-    download(icon, os.path.join(OUT, "sprites", "icon", "%d.png" % fid))
-    return fid
+    return fid if _save_sprites(fid, data.get("sprites", {})) else None
 
 
 def download_sprites(dexid):
-    """Front/back/icon from PokeAPI's Gen7 (ultra-sun-ultra-moon) sprites, with fallbacks."""
+    """Static pixel front/back/icon from PokeAPI (front_default = classic 2D dot sprite)."""
     data = api_get("pokemon/%d" % dexid)
-    if not data:
-        return False
-    spr = data.get("sprites", {})
-    versions = spr.get("versions", {})
-    gen7 = versions.get("generation-vii", {}).get("ultra-sun-ultra-moon", {})
-    icons = versions.get("generation-vii", {}).get("icons", {})
-    front = gen7.get("front_default") or spr.get("front_default")
-    back = (versions.get("generation-v", {}).get("black-white", {}).get("back_default")
-            or spr.get("back_default") or front)
-    icon = icons.get("front_default") or front
-    ok = download(front, os.path.join(OUT, "sprites", "front", "%d.png" % dexid))
-    download(back, os.path.join(OUT, "sprites", "back", "%d.png" % dexid))
-    download(icon, os.path.join(OUT, "sprites", "icon", "%d.png" % dexid))
-    return ok
+    return _save_sprites(dexid, data.get("sprites", {})) if data else False
 
 
 if __name__ == "__main__":

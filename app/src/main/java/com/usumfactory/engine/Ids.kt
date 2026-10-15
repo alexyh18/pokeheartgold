@@ -127,6 +127,7 @@ object Ab {
     const val PRANKSTER = 158
     const val SAND_FORCE = 159
     const val IRON_BARBS = 160
+    const val DISGUISE = 209  // Mimikyu: nullifies the first damaging hit, then busts.
 
     /** Abilities Mold Breaker ignores (ones that react to an incoming move). */
     val BREAKABLE = setOf(

@@ -61,13 +61,18 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
 
     /** Sprite id to draw while mega-evolved (the mega form's own art), or -1 if not mega. */
     var megaSprite: Int = -1
+    /** Mimikyu: its Disguise has been broken (Busted form). Drives the sprite + prevents re-nullify. */
+    var busted = false
 
-    /** The species id the UI should draw (illusion disguise > mega sprite > real species). */
+    /** The species id the UI should draw (illusion disguise > mega sprite > busted > real species). */
     val displaySpecies: Int get() = when {
         illusionSpecies >= 0 -> illusionSpecies
         megaSprite >= 0 -> megaSprite
+        busted && species.id == MIMIKYU_DEX -> MIMIKYU_BUSTED_SPRITE
         else -> species.id
     }
+
+    private companion object { const val MIMIKYU_DEX = 778; const val MIMIKYU_BUSTED_SPRITE = 10143 }
     /** The name the UI/messages should show (illusion disguise, else mega name, else real name). */
     val displayName: String get() = illusionName ?: megaName ?: species.nameKo
     val fainted get() = hp <= 0
