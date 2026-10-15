@@ -1226,7 +1226,9 @@ class Battle(
         if (a == Ab.TECHNICIAN && p <= 60) r = chain(r, 0x1800)
         if (a == Ab.RIVALRY && m.gender != 2 && t.gender != 2) r = chain(r, if (m.gender == t.gender) 0x1400 else 0xC00)
         if (a == Ab.IRON_FIST && move.has("PUNCH")) r = chain(r, 0x1333)
-        if (a == Ab.RECKLESS && move.effect.startsWith("RECOIL")) r = chain(r, 0x1333)
+        // Reckless boosts recoil moves 1.2x. Recoil is stored as a negative drain%, with the legacy
+        // RECOIL_* effect strings also covered. (Crash moves like High Jump Kick aren't counted here.)
+        if (a == Ab.RECKLESS && (move.drain < 0 || move.effect.startsWith("RECOIL"))) r = chain(r, 0x1333)
         if (a == Ab.SHEER_FORCE && hasSecondary(move)) r = chain(r, 0x14CC)
         if (a == Ab.SAND_FORCE && effWeather() == Weather.SAND && type in setOf(Types.ROCK, Types.GROUND, Types.STEEL)) r = chain(r, 0x14CC)
         if (a == Ab.DEFEATIST && m.hp * 2 <= m.maxHp) r = chain(r, 0x800)
@@ -1554,15 +1556,18 @@ class Battle(
                 msg(if (e == "RECOVER_DAMAGE_SLEEP") "${nm(t)}의 꿈을 먹었다!" else "${Josa.iGa(nm(t))} 체력을 흡수당했다!")
             }
         }
-        // recoil
-        val recoilDiv = when (e) {
-            "RECOIL_THIRD", "RECOIL_BURN_HIT", "RECOIL_PARALYZE_HIT" -> 3
-            "RECOIL_HALF" -> 2
+        // recoil. Recoil is carried in the data as a NEGATIVE `drain` percentage (e.g. Wood Hammer /
+        // Double-Edge/Flare Blitz = -33 -> 1/3 of the damage dealt, Head Smash = -50, Wild Charge = -25).
+        // The legacy RECOIL_* effect strings are also honoured for safety, but the data uses drain.
+        val recoilPercent = when {
+            move.drain < 0 -> -move.drain
+            e in setOf("RECOIL_THIRD", "RECOIL_BURN_HIT", "RECOIL_PARALYZE_HIT") -> 33
+            e == "RECOIL_HALF" -> 50
             else -> 0
         }
-        if (recoilDiv > 0 && total > 0 && ability(m) !in setOf(Ab.ROCK_HEAD, Ab.MAGIC_GUARD) && !m.fainted) {
+        if (recoilPercent > 0 && total > 0 && ability(m) !in setOf(Ab.ROCK_HEAD, Ab.MAGIC_GUARD) && !m.fainted) {
             msg("${Josa.eunNeun(nm(m))} 공격의 반동으로 데미지를 입었다!")
-            damage(m, maxOf(1, total / recoilDiv))
+            damage(m, maxOf(1, total * recoilPercent / 100))
         }
         if (e == "STRUGGLE" && !m.fainted && ability(m) != Ab.MAGIC_GUARD) {
             msg("${Josa.eunNeun(nm(m))} 공격의 반동으로 데미지를 입었다!")
