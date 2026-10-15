@@ -63,20 +63,25 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var megaSprite: Int = -1
     /** Mega forme's types, kept so the forme persists across switch-outs (Mega lasts the whole battle). */
     var megaTypes: List<Int>? = null
+    /** Darmanitan Zen Mode: active while HP <= 1/2 (reversible). Drives sprite/name/types/stats. */
+    var zenActive = false
+    var zenSprite: Int = -1
     /** Mimikyu: its Disguise has been broken (Busted form). Drives the sprite + prevents re-nullify. */
     var busted = false
 
-    /** The species id the UI should draw (illusion disguise > mega sprite > busted > real species). */
+    /** The species id the UI should draw (illusion disguise > mega sprite > zen > busted > real species). */
     val displaySpecies: Int get() = when {
         illusionSpecies >= 0 -> illusionSpecies
         megaSprite >= 0 -> megaSprite
+        zenActive && zenSprite >= 0 -> zenSprite
         busted && species.id == MIMIKYU_DEX -> MIMIKYU_BUSTED_SPRITE
         else -> species.id
     }
 
     private companion object { const val MIMIKYU_DEX = 778; const val MIMIKYU_BUSTED_SPRITE = 10143 }
-    /** The name the UI/messages should show (illusion disguise, else mega name, else real name). */
-    val displayName: String get() = illusionName ?: megaName ?: species.nameKo
+    /** Name shown (illusion > mega > zen-mode > real). */
+    var zenName: String? = null
+    val displayName: String get() = illusionName ?: megaName ?: (if (zenActive) zenName else null) ?: species.nameKo
     val fainted get() = hp <= 0
 
     // ---- volatile state (reset on switch)
@@ -171,6 +176,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         usedMoves.clear(); metronomeCount = 0; metronomeMove = null; focusPunchCharging = false
         focusEnergy = false; healBlockTurns = 0; embargoTurns = 0; wishTurns = 0; wishHp = 0; gemConsumedType = -1
         illusionSpecies = -1; illusionName = null
+        zenActive = false; zenSprite = -1; zenName = null  // Zen Mode reverts on switch; re-checked on entry/HP
         powerTrick = false
         // Reset battle stats to the baseline. For a Mega-Evolved mon, baseStats already holds the mega
         // stats (set in megaEvolve), so the forme persists across switch-outs for the whole battle.

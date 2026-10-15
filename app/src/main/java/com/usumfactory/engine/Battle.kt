@@ -590,9 +590,38 @@ class Battle(
         applyEntryAbility(m)
     }
 
+    /**
+     * Darmanitan's Zen Mode: with the Zen Mode ability, it flips to its Zen forme (Fire/Psychic, SpA
+     * stats) while HP <= 1/2 and back to the base forme when HP rises above 1/2. HP is unchanged by the
+     * flip. Called after any HP change (hpTriggers) and on entry.
+     */
+    private suspend fun checkZenMode(m: BattleMon) {
+        if (ability(m) != Ab.ZEN_MODE) return
+        val zen = data.zenBySpecies[m.species.id] ?: return
+        val shouldBeZen = m.hp * 2 <= m.maxHp
+        if (shouldBeZen == m.zenActive) return
+        if (shouldBeZen) {
+            m.zenActive = true
+            m.zenName = zen.nameKo
+            m.zenSprite = zen.sprite
+            m.types = zen.types.toMutableList()
+            val hp = m.stats[Stat.HP]
+            m.stats = m.info.statsFor(zen.base).also { it[Stat.HP] = hp }
+            msg("${Josa.eunNeun(nm(m))} 달마모드가 되었다!")
+        } else {
+            m.zenActive = false
+            m.types = (m.megaTypes ?: m.species.types).toMutableList()
+            val hp = m.stats[Stat.HP]
+            m.stats = m.baseStats.copyOf().also { it[Stat.HP] = hp }
+            msg("${Josa.eunNeun(nm(m))} 원래 모습으로 돌아왔다!")
+        }
+        emit(BattleEvent.SendOut(m.side, m))  // refresh sprite/name
+    }
+
     private suspend fun onEntry(m: BattleMon) {
         m.turnsOnField = 0
         applyEntryAbility(m)
+        checkZenMode(m)
     }
 
     /** Fires the active ability's "on-entry" effect (weather, Intimidate, Download, Trace, …). Also used
@@ -2231,6 +2260,7 @@ class Battle(
     /** HP-threshold items: Sitrus Berry at 1/2, pinch berries at 1/4 (1/2 with Gluttony). */
     private suspend fun hpTriggers(m: BattleMon) {
         if (m.fainted) return
+        checkZenMode(m)
         val it = item(m)
         if (it == It.SITRUS_BERRY && m.hp * 2 <= m.maxHp) eatBerry(m, it, forced = false)
         val pinch = if (ability(m) == Ab.GLUTTONY) 2 else 4

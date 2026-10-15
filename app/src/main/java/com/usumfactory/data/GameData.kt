@@ -93,6 +93,16 @@ data class MegaForme(
     val sprite: Int = 0,
 )
 
+/** An HP-triggered battle forme (Darmanitan's Zen Mode). base = HP,Atk,Def,Spe,SpA,SpD. */
+@Serializable
+data class ZenForme(
+    val species: Int,
+    val nameKo: String,
+    val types: List<Int>,
+    val base: List<Int>,
+    val sprite: Int = 0,
+)
+
 @Serializable
 data class TypeData(val id: Int, val key: String, val nameKo: String)
 
@@ -137,10 +147,13 @@ class GameData(
     sets: List<FactorySet>,
     val trainers: List<TrainerData>,
     megas: List<MegaForme> = emptyList(),
+    zenFormes: List<ZenForme> = emptyList(),
 ) {
     val species = species.associateBy { it.id }
     /** Mega formes keyed by the Mega Stone item id that triggers them. */
     val megasByStone = megas.associateBy { it.stone }
+    /** HP-triggered formes (Zen Mode) keyed by base species id. */
+    val zenBySpecies = zenFormes.associateBy { it.species }
     val moves = moves.associateBy { it.id }
     val movesByKey = moves.associateBy { it.key }
     val items = items.associateBy { it.id }
@@ -187,6 +200,7 @@ class GameData(
             json.decodeFromString(read("data/sets.json")),
             json.decodeFromString(read("data/trainers.json")),
             runCatching { json.decodeFromString<List<MegaForme>>(read("data/megas.json")) }.getOrDefault(emptyList()),
+            runCatching { json.decodeFromString<List<ZenForme>>(read("data/zen.json")) }.getOrDefault(emptyList()),
         )
     }
 }

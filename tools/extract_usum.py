@@ -117,7 +117,7 @@ FORM_NAME_KO = {
     "oricorio-sensu": "춤추새(마이마이)", "rotom-heat": "로토무(히트)", "rotom-wash": "로토무(워시)",
     "rotom-frost": "로토무(프로스트)", "rotom-fan": "로토무(스핀)", "rotom-mow": "로토무(커트)",
     "ninetales-alola": "나인테일(알로라)", "raichu-alola": "라이츄(알로라)", "sandslash-alola": "고지(알로라)",
-    "golem-alola": "폭타(알로라)", "muk-alola": "질퍽이(알로라)", "dugtrio-alola": "닥트리오(알로라)",
+    "golem-alola": "딱구리(알로라)", "muk-alola": "질퍽이(알로라)", "dugtrio-alola": "닥트리오(알로라)",
     "exeggutor-alola": "나시(알로라)", "marowak-alola": "텅구리(알로라)",
 }
 
@@ -418,8 +418,24 @@ def main():
         sid += 1
 
     megas_out = [m for m in mega_by_species.values() if m["stone"] != 0]
+
+    # HP-triggered Zen Mode forme (Darmanitan, species 555) if it's in the pool.
+    zen_out = []
+    if 555 in species_set_ids:
+        zdata = api_get("pokemon/darmanitan-zen")
+        if zdata:
+            ztypes = [TYPE_ID[t["type"]["name"].capitalize()] for t in sorted(zdata["types"], key=lambda x: x["slot"])
+                      if t["type"]["name"].capitalize() in TYPE_ID]
+            zbs = {s["stat"]["name"]: s["base_stat"] for s in zdata["stats"]}
+            zen_out.append({
+                "species": 555, "nameKo": "불비달마(달마모드)", "types": ztypes,
+                "base": [zbs["hp"], zbs["attack"], zbs["defense"], zbs["speed"], zbs["special-attack"], zbs["special-defense"]],
+                "sprite": zdata["id"],
+            })
+            download_pixel_sprites(zdata["id"])
+
     print("sets:", len(sets), "mega sets kept:", sum(1 for s in sets if s["form"] == 1),
-          "mega formes:", len(megas_out), "z-crystals:", len(used_z), "species in pool:", len(species_set_ids))
+          "mega formes:", len(megas_out), "zen:", len(zen_out), "z-crystals:", len(used_z), "species in pool:", len(species_set_ids))
     if unknown:
         print("UNRESOLVED (first 20):", sorted(unknown)[:20])
 
@@ -478,6 +494,7 @@ def main():
     write("data/sets.json", sets)
     write("data/trainers.json", trainers_out)
     write("data/megas.json", megas_out)
+    write("data/zen.json", zen_out)
     print("DONE. species=%d moves=%d items=%d abilities=%d sets=%d trainers=%d megas=%d" % (
         len(species_set_ids), len(moves_out), len(items_out), len(abil_out), len(sets), len(trainers_out), len(megas_out)))
 
@@ -587,6 +604,7 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "pursuit": "HIT_BEFORE_SWITCH", "fly": "FLY", "dig": "DIG", "dive": "DIVE",
         "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
+        "future_sight": "HIT_IN_3_TURNS", "doom_desire": "HIT_IN_3_TURNS",
         # self-KO moves: the user faints after dealing damage
         "explosion": "USER_FAINTS", "self_destruct": "USER_FAINTS", "misty_explosion": "USER_FAINTS",
         "memento": "USER_FAINTS_LOWER_FOE", "healing_wish": "USER_FAINTS_HEAL_SWITCHIN",
