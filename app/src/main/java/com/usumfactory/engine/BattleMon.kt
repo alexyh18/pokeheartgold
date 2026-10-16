@@ -157,6 +157,13 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
     var wishTurns = 0
     var wishHp = 0
     var gemConsumedType = -1
+    /** Which protect variant is up this turn: null / "PROTECT" / "SPIKY" (Spiky Shield) / "BUNKER" (Baneful Bunker). */
+    var protectType: String? = null
+    /** Lock-On / Mind Reader: the user's next move against [lockOnTarget] can't miss. */
+    var lockOnTurns = 0
+    var lockOnTarget: BattleMon? = null
+    /** Imprison: while in, the foe can't use any move this mon also knows. */
+    var imprison = false
 
     fun resetVolatile() {
         // A Mega-Evolved Pokémon keeps its forme (types + stats + ability) across switch-outs for the
@@ -181,6 +188,7 @@ class BattleMon(val data: GameData, val info: MonInfo, val side: Int) {
         illusionSpecies = -1; illusionName = null
         zenActive = false; zenSprite = -1; zenName = null  // Zen Mode reverts on switch; re-checked on entry/HP
         powerTrick = false
+        protectType = null; lockOnTurns = 0; lockOnTarget = null; imprison = false
         // Reset battle stats to the baseline. For a Mega-Evolved mon, baseStats already holds the mega
         // stats (set in megaEvolve), so the forme persists across switch-outs for the whole battle.
         stats = baseStats.copyOf()

@@ -45,6 +45,7 @@ class Side(val index: Int, val party: List<BattleMon>, val trainerLabel: String)
     val mon: BattleMon get() = party[active]
     var reflect = 0
     var lightScreen = 0
+    var auroraVeil = 0
     var spikes = 0
     var toxicSpikes = 0
     var stealthRock = false
@@ -272,8 +273,15 @@ class Battle(
             s.move.id != m.disabledMove?.id &&
             !(m.tauntTurns > 0 && s.move.isStatus) &&
             !(m.tormented && m.lastMove?.id == s.move.id) &&
+            !imprisonedFor(m, s.move) &&
             (m.choiceMove == null || item(m).let { It.isChoice(it) }.not() || m.choiceMove?.id == s.move.id) &&
             (m.encoreMove == null || m.encoreMove?.id == s.move.id)
+    }
+
+    /** Imprison: a move is sealed if the active foe used Imprison and also knows a move with this id. */
+    private fun imprisonedFor(m: BattleMon, move: MoveData): Boolean {
+        val f = foe(m)
+        return !f.fainted && f.imprison && f.moves.any { it.move.id == move.id }
     }
 
     fun canSwitch(m: BattleMon): Boolean {
@@ -346,7 +354,7 @@ class Battle(
     private suspend fun playTurn() {
         for (s in sides) {
             val m = s.mon
-            m.protecting = false; m.enduring = false; m.flinch = false
+            m.protecting = false; m.enduring = false; m.flinch = false; m.protectType = null
             m.movedThisTurn = false; m.tookDamageThisTurn = false; m.roosted = false
         }
         for (i in 0..1) {
@@ -849,6 +857,10 @@ class Battle(
             msg("${Josa.eunNeun(nm(m))} 사슬묶기로 ${Josa.eulReul(mvName(move))} 쓸 수 없다!")
             return true
         }
+        if (imprisonedFor(m, move)) {
+            msg("${Josa.eunNeun(nm(m))} 봉인되어 ${Josa.eulReul(mvName(move))} 쓸 수 없다!")
+            return true
+        }
         if (m.tauntTurns > 0 && move.isStatus) {
             msg("${Josa.eunNeun(nm(m))} 도발당해서 ${Josa.eulReul(mvName(move))} 쓸 수 없다!")
             return true
@@ -1040,6 +1052,14 @@ class Battle(
         if (t.protecting && !move.targetsSelf && !move.targetsField && move.key !in protectBypassMoves) {
             msg("${Josa.eunNeun(nm(t))} 공격으로부터 몸을 지켰다!")
             if (e == "CONTINUE_AND_CONFUSE_SELF") m.lockedMove = null
+            // Spiky Shield / Baneful Bunker punish a contact attacker.
+            if (move.has("CONTACT") && !m.fainted) when (t.protectType) {
+                "SPIKY" -> if (ability(m) != Ab.MAGIC_GUARD) {
+                    msg("${Josa.eunNeun(nm(m))} 가시에 데미지를 입었다!")
+                    damage(m, maxOf(1, m.maxHp / 8)); if (m.fainted) faint(m)
+                }
+                "BUNKER" -> trySetStatus(m, Status.POISON, t, silentFail = true)
+            }
             crashRecoil(m, move)
             return
         }
@@ -1138,6 +1158,8 @@ class Battle(
     private fun accuracyCheck(m: BattleMon, t: BattleMon, move: MoveData): Boolean {
         // Z-moves never miss (even when built on an inaccurate base move like Hydro Pump / Focus Blast).
         if (m.zMoveActive) return true
+        // Lock-On / Mind Reader: the user's next move against the locked target can't miss.
+        if (m.lockOnTurns > 0 && m.lockOnTarget === t) return true
         if (ability(m) == Ab.NO_GUARD || ability(t) == Ab.NO_GUARD) return true
         val w = effWeather()
         if (move.effect == "ONE_HIT_KO") {
@@ -1363,7 +1385,7 @@ class Battle(
         // final modifiers
         var fr = 0x1000
         val side = sideOf(t)
-        if (!crit && ((physical && side.reflect > 0) || (!physical && side.lightScreen > 0))) fr = chain(fr, 0x800)
+        if (!crit && (side.auroraVeil > 0 || (physical && side.reflect > 0) || (!physical && side.lightScreen > 0))) fr = chain(fr, 0x800)
         if (a == Ab.TINTED_LENS && eff < 4) fr = chain(fr, 0x2000)
         if (a == Ab.SNIPER && crit) fr = chain(fr, 0x1800)
         if ((da == Ab.FILTER || da == Ab.SOLID_ROCK) && eff > 4) fr = chain(fr, 0xC00)
@@ -1667,7 +1689,7 @@ class Battle(
             }
             "REMOVE_SCREENS" -> {
                 val s = sideOf(t)
-                if (s.reflect > 0 || s.lightScreen > 0) { s.reflect = 0; s.lightScreen = 0; msg("벽을 부쉈다!") }
+                if (s.reflect > 0 || s.lightScreen > 0 || s.auroraVeil > 0) { s.reflect = 0; s.lightScreen = 0; s.auroraVeil = 0; msg("벽을 부쉈다!") }
             }
             "SWITCH_HIT" -> Unit
         }
@@ -1952,6 +1974,9 @@ class Battle(
             }
             "TORMENT" -> if (t.tormented) msg("하지만 실패했다!") else { t.tormented = true; msg("${Josa.eunNeun(nm(t))} 트집을 잡혔다!") }
             "FORESIGHT" -> { t.foresighted = true; msg("${Josa.eunNeun(nm(m))} ${Josa.eulReul(nm(t))} 꿰뚫어 보았다!") }
+            // Lock-On / Mind Reader: next turn's move against this target is guaranteed to hit. Set to 2
+            // so it survives this turn's end-of-turn decrement and is still active on the user's next turn.
+            "LOCK_ON" -> { m.lockOnTurns = 2; m.lockOnTarget = t; msg("${Josa.eunNeun(nm(m))} ${nm(t)}에게 조준을 맞췄다!") }
             // Gen 6+: Mean Look/Block/Spider Web fail against Ghost-types (they can't be trapped).
             "PREVENT_ESCAPE" -> if (t.trapped || t.hasType(Types.GHOST)) msg("하지만 실패했다!") else { t.trapped = true; msg("${Josa.eunNeun(nm(t))} 이제 도망갈 수 없다!") }
             "DECREASE_LAST_MOVE_PP" -> {
@@ -2084,6 +2109,7 @@ class Battle(
                 damage(m, m.hp); faint(m)
             }
             "GRAVITY" -> if (gravityTurns > 0) msg("하지만 실패했다!") else { gravityTurns = 5; msg("중력이 강해졌다!") }
+            "IMPRISON" -> if (m.imprison) msg("하지만 실패했다!") else { m.imprison = true; msg("${Josa.eunNeun(nm(m))} 상대의 기술을 봉인했다!") }
             "WONDER_ROOM", "HALVE_FIRE_DAMAGE", "APPLY_MAGIC_COAT", "STEAL_STATUS_MOVE", "MAKE_GLOBAL_TARGET",
             "ALLY_SWITCH", "BOOST_ALLY_POWER_BY_50_PERCENT", "QUICK_GUARD", "WIDE_GUARD", "USE_RANDOM_ALLY_MOVE",
             "NEXT_ATTACK_ALWAYS_HITS", "DEF_UP_DOUBLE_ROLLOUT_POWER_" -> msg("하지만 실패했다!")
@@ -2131,7 +2157,7 @@ class Battle(
                 emit(BattleEvent.StatAnim(m.side, true))
                 msg("${Josa.eunNeun(nm(m))} 체력을 깎아서 공격을 최대로 올렸다!")
             }
-            "PROTECT", "SURVIVE_WITH_1_HP" -> {
+            "PROTECT", "SURVIVE_WITH_1_HP", "SPIKY_SHIELD", "BANEFUL_BUNKER" -> {
                 // Consecutive Protect/Endure gets likelier to fail (1/2, 1/4, …). Protect still succeeds
                 // when the user moves last (it just has nothing left to block), matching the games.
                 val chance = 1 shl minOf(m.protectCount, 8)
@@ -2139,8 +2165,13 @@ class Battle(
                     m.protectCount = 0; msg("하지만 실패했다!"); return
                 }
                 m.protectCount++
-                if (e == "PROTECT") { m.protecting = true; msg("${Josa.eunNeun(nm(m))} 방어 태세에 들어갔다!") }
-                else { m.enduring = true; msg("${Josa.eunNeun(nm(m))} 버티기 태세에 들어갔다!") }
+                if (e == "SURVIVE_WITH_1_HP") {
+                    m.enduring = true; msg("${Josa.eunNeun(nm(m))} 버티기 태세에 들어갔다!")
+                } else {
+                    m.protecting = true
+                    m.protectType = when (e) { "SPIKY_SHIELD" -> "SPIKY"; "BANEFUL_BUNKER" -> "BUNKER"; else -> "PROTECT" }
+                    msg("${Josa.eunNeun(nm(m))} 방어 태세에 들어갔다!")
+                }
                 return
             }
             "SET_SUBSTITUTE" -> {
@@ -2165,6 +2196,14 @@ class Battle(
                     if (s.lightScreen > 0) { msg("하지만 실패했다!"); return }
                     s.lightScreen = turns; msg(if (m.side == 0) "빛의장막으로 특수공격에 강해졌다!" else "상대는 빛의장막으로 특수공격에 강해졌다!")
                 }
+            }
+            "SET_AURORA_VEIL" -> {
+                val s = sideOf(m)
+                // Aurora Veil can only be set while hail is falling; halves both physical and special.
+                if (effWeather() != Weather.HAIL) { msg("하지만 실패했다!"); return }
+                if (s.auroraVeil > 0) { msg("하지만 실패했다!"); return }
+                s.auroraVeil = if (item(m) == It.LIGHT_CLAY) 8 else 5
+                msg(if (m.side == 0) "오로라베일로 공격에 강해졌다!" else "상대는 오로라베일로 공격에 강해졌다!")
             }
             "WEATHER_SUN" -> setWeather(Weather.SUN, if (item(m) == It.HEAT_ROCK) 8 else 5, null)
             "WEATHER_RAIN" -> setWeather(Weather.RAIN, if (item(m) == It.DAMP_ROCK) 8 else 5, null)
@@ -2670,6 +2709,7 @@ class Battle(
             if (m.encoreMove != null && m.moves.firstOrNull { it.move.id == m.encoreMove?.id }?.pp == 0) { m.encoreMove = null; m.encoreTurns = 0 }
             if (m.disableTurns > 0 && --m.disableTurns == 0) { m.disabledMove = null; msg("${nm(m)}의 사슬묶기가 풀렸다!") }
             if (m.magnetRiseTurns > 0 && --m.magnetRiseTurns == 0) msg("${nm(m)}의 전자부유 효과가 사라졌다!")
+            if (m.lockOnTurns > 0 && --m.lockOnTurns == 0) m.lockOnTarget = null
             if (m.chargeTurnsLeft > 0 && --m.chargeTurnsLeft == 0) m.charged = false
             if (m.yawnTurns > 0 && --m.yawnTurns == 0) trySetStatus(m, Status.SLEEP, null, silentFail = true)
             if (m.perishCount > 0) {
@@ -2687,6 +2727,7 @@ class Battle(
         for (s in sides) {
             if (s.reflect > 0 && --s.reflect == 0) msg(if (s.index == 0) "리플렉터의 효과가 사라졌다!" else "상대의 리플렉터의 효과가 사라졌다!")
             if (s.lightScreen > 0 && --s.lightScreen == 0) msg(if (s.index == 0) "빛의장막의 효과가 사라졌다!" else "상대의 빛의장막의 효과가 사라졌다!")
+            if (s.auroraVeil > 0 && --s.auroraVeil == 0) msg(if (s.index == 0) "오로라베일의 효과가 사라졌다!" else "상대의 오로라베일의 효과가 사라졌다!")
             if (s.tailwind > 0 && --s.tailwind == 0) msg(if (s.index == 0) "등 뒤의 바람이 멈췄다!" else "상대의 등 뒤의 바람이 멈췄다!")
             if (s.safeguard > 0 && --s.safeguard == 0) msg(if (s.index == 0) "세이프가드의 효과가 사라졌다!" else "상대의 세이프가드의 효과가 사라졌다!")
             if (s.mist > 0 && --s.mist == 0) msg(if (s.index == 0) "흰안개가 사라졌다!" else "상대의 흰안개가 사라졌다!")

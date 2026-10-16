@@ -631,7 +631,7 @@ def build_move(slug, mid, ko_move, ko_move_desc, moves_csv):
     # derive a coarse engine effect string
     cat = (meta.get("category") or {}).get("name", "")
     effect = derive_effect(slug, category, cat, ailment, drain, heal, stat_changes, meta)
-    flags = derive_flags(api, category)
+    flags = derive_flags(slug, api, category)
     # Whether a damaging move's stat changes apply to the USER rather than the target. PokeAPI's
     # meta category "damage-raise" means the user buffs/debuffs itself (Charge Beam +SpA, Overheat
     # -SpA, Close Combat -Def/-SpD, …); "damage-lower" lowers the target (Crunch, Psychic, …).
@@ -681,7 +681,7 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "trick_room": "TRICK_ROOM", "tailwind": "TAILWIND", "stealth_rock": "STEALTH_ROCK",
         "electric_terrain": "TERRAIN_ELECTRIC", "grassy_terrain": "TERRAIN_GRASSY",
         "misty_terrain": "TERRAIN_MISTY", "psychic_terrain": "TERRAIN_PSYCHIC",
-        "spikes": "SPIKES", "toxic_spikes": "TOXIC_SPIKES", "leech_seed": "LEECH_SEED",
+        "spikes": "SPIKES", "toxic_spikes": "TOXIC_SPIKES", "leech_seed": "STATUS_LEECH_SEED",
         "will_o_wisp": "STATUS_BURN", "thunder_wave": "STATUS_PARALYZE", "toxic": "STATUS_TOXIC",
         "hidden_power": "RANDOM_POWER_BASED_ON_IVS", "weather_ball": "CHANGE_TYPE_WITH_WEATHER",
         "gyro_ball": "POWER_BASED_ON_LOW_SPEED", "electro_ball": "ELECTRO_BALL",
@@ -737,6 +737,10 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "recycle": "RECYCLE", "grudge": "REMOVE_ALL_PP_ON_DEFEAT", "spite": "DECREASE_LAST_MOVE_PP",
         "aromatherapy": "HEAL_STATUS", "refresh": "HEAL_STATUS", "heal_bell": "HEAL_STATUS",
         "conversion2": "CONVERSION2", "acupressure": "RANDOM_STAT_UP_2", "metronome": "CALL_RANDOM_MOVE",
+        # ---- Newly implemented status moves (were NONE -> no engine case fired).
+        "aurora_veil": "SET_AURORA_VEIL",
+        "spiky_shield": "SPIKY_SHIELD", "baneful_bunker": "BANEFUL_BUNKER",
+        "lock_on": "LOCK_ON", "mind_reader": "LOCK_ON", "imprison": "IMPRISON",
     }
     if s in named and named[s]:
         return named[s]
@@ -768,15 +772,51 @@ def flinch_from(meta):
     return (meta.get("flinch_chance") or 0) > 0
 
 
-def derive_flags(api, category):
+# Physical moves that do NOT make contact (ranged/projectile/no-touch attacks). Everything else that's
+# physical makes contact. This matches the games closely enough for contact abilities/items.
+NON_CONTACT_PHYSICAL = {
+    "earthquake", "magnitude", "bulldoze", "fissure", "bonemerang", "bone-rush", "bone-club",
+    "rock-slide", "rock-throw", "rock-blast", "rock-tomb", "stone-edge", "rollout", "ancient-power",
+    "smack-down", "gyro-ball", "metal-burst", "self-destruct", "explosion", "spike-cannon",
+    "pin-missile", "barrage", "egg-bomb", "magnet-bomb", "bullet-seed", "seed-bomb", "icicle-spear",
+    "ice-shard", "icicle-crash", "razor-leaf", "leaf-tornado", "leaf-storm", "petal-blizzard",
+    "aeroblast", "sky-attack", "dragon-darts", "poison-sting", "sludge", "gunk-shot", "poison-jab",
+    "feint-attack", "beat-up", "present", "fling", "natural-gift", "trump-card", "freeze-dry",
+    "psycho-cut", "secret-sword", "sacred-fire", "thousand-arrows", "thousand-waves", "land-s-wrath",
+    "diamond-storm", "precipice-blades", "fury-cutter",
+}
+# Sound-based moves (ignore Substitute, hit through; Soundproof blocks).
+SOUND_MOVES = {
+    "snore", "uproar", "hyper-voice", "round", "echoed-voice", "relic-song", "boomburst",
+    "bug-buzz", "chatter", "disarming-voice", "parting-shot", "snarl", "sparkling-aria",
+    "clanging-scales", "clangorous-soulblaze", "growl", "roar", "sing", "supersonic",
+    "metal-sound", "grass-whistle", "screech", "perish-song", "heal-bell", "confide", "noble-roar",
+}
+PUNCH_MOVES = {
+    "mega-punch", "comet-punch", "fire-punch", "ice-punch", "thunder-punch", "dizzy-punch",
+    "mach-punch", "dynamic-punch", "focus-punch", "sky-uppercut", "bullet-punch", "drain-punch",
+    "shadow-punch", "hammer-arm", "power-up-punch", "ice-hammer", "double-iron-bash", "meteor-mash",
+    "plasma-fists",
+}
+DEFROST_MOVES = {"flame-wheel", "sacred-fire", "flare-blitz", "fusion-flare", "scald", "steam-eruption", "burn-up"}
+
+
+def derive_flags(slug, api, category):
     flags = []
-    for fl in (api or {}).get("meta", {}) and [] or []:
-        pass
-    names = [f["name"] for f in (api or {}).get("flags", []) or []] if api else []
-    # PokeAPI /move doesn't list flags under "flags"; use learnset-independent heuristics instead.
-    # Contact: physical melee moves generally make contact; use PokeAPI "contact" via effect text is unreliable,
-    # so approximate: physical moves make contact unless clearly ranged.
-    RANGED = {"earthquake", "surf", "rock-slide", "flamethrower"}  # not exhaustive; only affects contact abilities
+    s = slug  # hyphenated slug, e.g. "wood-hammer"
+    dc = (api or {}).get("damage_class", {}).get("name") if api else None
+    is_physical = (dc == "physical") or (category == "PHYSICAL")
+    if is_physical and s not in NON_CONTACT_PHYSICAL:
+        flags.append("CONTACT")
+    if s in SOUND_MOVES:
+        flags.append("SOUND")
+    if s in PUNCH_MOVES:
+        flags.append("PUNCH")
+    if s in DEFROST_MOVES:
+        flags.append("DEFROST")
+    # Moves blocked by Protect: nearly all damaging moves and most targeted status moves. The engine
+    # now determines Protect-blocking structurally (foe-target & not self/field), so no PROTECT flag
+    # is needed here.
     return flags
 
 
