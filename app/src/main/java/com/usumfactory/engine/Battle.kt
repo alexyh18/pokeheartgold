@@ -638,6 +638,17 @@ class Battle(
     }
 
     /** Whether [m] can Mega-Evolve now: holds the matching Mega Stone and hasn't done so this battle. */
+    /** Whether a mon's held item can be traded/removed by Trick/Switcheroo/Knock Off (Gen 6+). A
+     *  Z-Crystal and the species' own Mega Stone are bolted on and can't be moved. */
+    private fun tradeable(m: BattleMon): Boolean {
+        val id = m.item
+        if (id == It.NONE) return true
+        if (It.isZCrystal(id)) return false
+        val mega = data.megasByStone[id]
+        if (mega != null && mega.species == m.species.id) return false
+        return true
+    }
+
     fun canMega(m: BattleMon): Boolean {
         if (m.megaEvolved) return false
         if (sideOf(m).usedMega) return false   // one Mega Evolution per battle per trainer
@@ -1948,7 +1959,11 @@ class Battle(
                 }
             }
             "SWITCH_HELD_ITEMS" -> {
-                if ((m.item == It.NONE && t.item == It.NONE) || ability(t) == Ab.STICKY_HOLD) msg("하지만 실패했다!")
+                // Trick / Switcheroo. Fails if both have no item, the target has Sticky Hold, or either
+                // holds an untradeable item (Z-Crystal / a matching Mega Stone), matching Gen 6+.
+                if ((m.item == It.NONE && t.item == It.NONE) || ability(t) == Ab.STICKY_HOLD ||
+                    !tradeable(m) || !tradeable(t)
+                ) msg("하지만 실패했다!")
                 else {
                     val a = m.item; m.item = t.item; t.item = a
                     m.choiceMove = null; t.choiceMove = null

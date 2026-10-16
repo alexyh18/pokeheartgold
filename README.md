@@ -12,7 +12,7 @@
 
 ## 설치
 
-`release/usum-battle-tree-v2.7.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/usum-battle-tree-v2.8.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -36,6 +36,10 @@ python3 tools/extract_usum.py       # Tree-Sets + PokeAPI -> app/src/main/assets
 - bw2 배틀서브웨이 프로젝트(`../bw2-factory`)와 **완전히 독립**된 별도 프로젝트입니다.
 - Gen5 엔진을 가져오면서 **페어리 타입(id 17)**을 타입 상성표(18×18)에 추가했고, 도구 id를 PokeAPI 체계로 재정의했습니다.
 - Rotom·Oricorio·Lycanroc의 폼 세트는 기본 폼으로 매핑. 메가 포켓몬은 스프라이트가 기본 폼을 재사용(종족치·타입·특성은 메가로 변경).
+
+## v2.8 변경점
+
+- **트릭·바꿔치기(Trick/Switcheroo) 구현** — 사용자와 상대의 지닌 도구를 서로 바꿉니다. 추출 데이터상 effect가 `NONE`이라 작동하지 않던 것을 `SWITCH_HELD_ITEMS`로 바로잡음(엔진 처리는 이미 구현되어 있었음). 교환 시 구애 계열 기술 잠금도 해제됩니다. 끈기(Sticky Hold) 특성 상대, 그리고 Z크리스탈·자신의 메가스톤 같은 교환 불가 도구에는 실패 처리(6세대 이후 사양)
 
 ## v2.7 변경점
 

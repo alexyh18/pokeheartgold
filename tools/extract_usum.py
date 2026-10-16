@@ -674,6 +674,8 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
         "future_sight": "HIT_IN_3_TURNS", "doom_desire": "HIT_IN_3_TURNS",
+        # Trick / Switcheroo swap the two Pokémon's held items.
+        "trick": "SWITCH_HELD_ITEMS", "switcheroo": "SWITCH_HELD_ITEMS",
         # self-KO moves: the user faints after dealing damage
         "explosion": "USER_FAINTS", "self_destruct": "USER_FAINTS", "misty_explosion": "USER_FAINTS",
         "memento": "USER_FAINTS_LOWER_FOE", "healing_wish": "USER_FAINTS_HEAL_SWITCHIN",
