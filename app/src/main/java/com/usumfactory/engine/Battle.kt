@@ -1119,6 +1119,8 @@ class Battle(
     }
 
     private fun accuracyCheck(m: BattleMon, t: BattleMon, move: MoveData): Boolean {
+        // Z-moves never miss (even when built on an inaccurate base move like Hydro Pump / Focus Blast).
+        if (m.zMoveActive) return true
         if (ability(m) == Ab.NO_GUARD || ability(t) == Ab.NO_GUARD) return true
         val w = effWeather()
         if (move.effect == "ONE_HIT_KO") {
@@ -1448,13 +1450,22 @@ class Battle(
             if (e == "USER_FAINTS" && !m.fainted) { damage(m, m.hp); faint(m) }
             return
         }
-        // Wonder-Guard-like checks aren't needed for the Factory pool.
+        // Multi-hit count. Driven by the move's hitsMin/hitsMax data (effect strings are kept as a
+        // fallback). A 2-5 hit move rolls 2(35%)/3(35%)/4(15%)/5(15%); Skill Link always hits the max.
         val hits = when {
             e == "HIT_TWICE" -> 2
-            e == "MULTI_HIT" -> {
-                val r = rng.next(100)
-                when { r < 35 -> 2; r < 70 -> 3; r < 85 -> 4; else -> 5 }
+            e == "MULTI_HIT" || (move.hitsMax > move.hitsMin && move.hitsMax > 1) -> {
+                val hi = move.hitsMax.coerceAtMost(5)
+                if (ability(m) == Ab.SKILL_LINK) hi // Skill Link always hits the maximum number of times
+                else {
+                    val lo = move.hitsMin.coerceAtLeast(2)
+                    if (hi <= lo) lo else {
+                        val r = rng.next(100)
+                        when { r < 35 -> 2; r < 70 -> 3; r < 85 -> 4; else -> 5 }.coerceIn(lo, hi)
+                    }
+                }
             }
+            move.hitsMin > 1 && move.hitsMin == move.hitsMax -> move.hitsMin // fixed 2-hit (Double Kick, Dual Chop, …)
             else -> 1
         }
         val dealt = mutableListOf<Int>()

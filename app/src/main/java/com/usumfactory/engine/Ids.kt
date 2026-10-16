@@ -80,6 +80,7 @@ object Ab {
     const val IRON_FIST = 89
     const val POISON_HEAL = 90
     const val ADAPTABILITY = 91
+    const val SKILL_LINK = 92  // Multi-hit (2-5) moves always hit the maximum number of times.
     const val HYDRATION = 93
     const val QUICK_FEET = 95
     const val SNIPER = 97
