@@ -698,6 +698,27 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         # Sleep Talk / Snore can only be used while the user is asleep. The engine gates both by these
         # effect strings; PokeAPI leaves them as plain status/flinch moves, so set them explicitly.
         "sleep_talk": "USE_RANDOM_LEARNED_MOVE_SLEEP", "snore": "DAMAGE_WHILE_ASLEEP",
+        # ---- Healing moves. The engine has no generic "HEAL" effect; each heal is a specific effect
+        # string. Without these, Recover/Roost/Synthesis/etc. silently fail.
+        "recover": "RESTORE_HALF_HP", "slack_off": "RESTORE_HALF_HP", "soft_boiled": "RESTORE_HALF_HP",
+        "milk_drink": "RESTORE_HALF_HP", "heal_order": "RESTORE_HALF_HP", "shore_up": "RESTORE_HALF_HP",
+        "roost": "HEAL_HALF_REMOVE_FLYING_TYPE",
+        "synthesis": "HEAL_HALF_MORE_IN_SUN", "moonlight": "HEAL_HALF_MORE_IN_SUN", "morning_sun": "HEAL_HALF_MORE_IN_SUN",
+        "wish": "HEAL_IN_3_TURNS", "swallow": "SWALLOW", "stockpile": "STOCKPILE", "spit_up": "SPIT_UP",
+        "belly_drum": "MAX_ATK_LOSE_HALF_MAX_HP",
+        # ---- Field / self utility moves the engine already implements under specific effect strings.
+        "ingrain": "GROUND_TRAP_USER_CONTINUOUS_HEAL", "aqua_ring": "RESTORE_HP_EVERY_TURN",
+        "magnet_rise": "GIVE_GROUND_IMMUNITY", "power_trick": "SWAP_ATK_DEF",
+        "reflect": "SET_REFLECT", "light_screen": "SET_LIGHT_SCREEN",
+        "safeguard": "PREVENT_STATUS", "mist": "PREVENT_STAT_REDUCTION", "focus_energy": "CRIT_UP_2",
+        "rain_dance": "WEATHER_RAIN", "sunny_day": "WEATHER_SUN", "sandstorm": "WEATHER_SANDSTORM", "hail": "WEATHER_HAIL",
+        "haze": "RESET_STAT_CHANGES", "perish_song": "ALL_FAINT_3_TURNS", "curse": "CURSE",
+        "nightmare": "STATUS_NIGHTMARE", "yawn": "STATUS_SLEEP_NEXT_TURN", "pain_split": "AVERAGE_HP",
+        "foresight": "FORESIGHT", "odor_sleuth": "FORESIGHT", "mean_look": "PREVENT_ESCAPE", "block": "PREVENT_ESCAPE",
+        "gastro_acid": "SUPRESS_ABILITY", "gravity": "GRAVITY", "psych_up": "COPY_STAT_CHANGES",
+        "recycle": "RECYCLE", "grudge": "REMOVE_ALL_PP_ON_DEFEAT", "spite": "DECREASE_LAST_MOVE_PP",
+        "aromatherapy": "HEAL_STATUS", "refresh": "HEAL_STATUS", "heal_bell": "HEAL_STATUS",
+        "conversion2": "CONVERSION2", "acupressure": "RANDOM_STAT_UP_2", "metronome": "CALL_RANDOM_MOVE",
     }
     if s in named and named[s]:
         return named[s]
