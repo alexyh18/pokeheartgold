@@ -12,7 +12,7 @@
 
 ## 설치
 
-`release/usum-battle-tree-v3.2.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/usum-battle-tree-v3.3.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -36,6 +36,10 @@ python3 tools/extract_usum.py       # Tree-Sets + PokeAPI -> app/src/main/assets
 - bw2 배틀서브웨이 프로젝트(`../bw2-factory`)와 **완전히 독립**된 별도 프로젝트입니다.
 - Gen5 엔진을 가져오면서 **페어리 타입(id 17)**을 타입 상성표(18×18)에 추가했고, 도구 id를 PokeAPI 체계로 재정의했습니다.
 - Rotom·Oricorio·Lycanroc의 폼 세트는 기본 폼으로 매핑. 메가 포켓몬은 스프라이트가 기본 폼을 재사용(종족치·타입·특성은 메가로 변경).
+
+## v3.3 변경점
+
+- **파괴광선 반동(재충전) 구현** — 파괴광선·기가임팩트·록랙커 사용 후 다음 턴에 "공격의 반동으로 움직일 수 없다!"로 재충전하며 행동할 수 없습니다. 추출 데이터상 effect가 `NONE`이라 재충전 없이 매 턴 쓸 수 있던 것을 `RECHARGE_AFTER`로 바로잡음(엔진 처리는 이미 구현되어 있었음)
 
 ## v3.2 변경점
 

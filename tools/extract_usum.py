@@ -691,6 +691,11 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "pursuit": "HIT_BEFORE_SWITCH", "fly": "FLY", "dig": "DIG", "dive": "DIVE",
         # Phantom Force / Shadow Force: 2-turn vanish like Dig, but ignores Protect on the strike.
         "phantom_force": "PHANTOM_FORCE", "shadow_force": "PHANTOM_FORCE",
+        # Recharge moves: the user must spend the next turn recharging (can't act).
+        "hyper_beam": "RECHARGE_AFTER", "giga_impact": "RECHARGE_AFTER", "rock_wrecker": "RECHARGE_AFTER",
+        "blast_burn": "RECHARGE_AFTER", "hydro_cannon": "RECHARGE_AFTER", "frenzy_plant": "RECHARGE_AFTER",
+        "roar_of_time": "RECHARGE_AFTER", "prismatic_laser": "RECHARGE_AFTER", "eternabeam": "RECHARGE_AFTER",
+        "meteor_assault": "RECHARGE_AFTER",
         "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
         "future_sight": "HIT_IN_3_TURNS", "doom_desire": "HIT_IN_3_TURNS",
