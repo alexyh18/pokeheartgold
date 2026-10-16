@@ -12,7 +12,7 @@
 
 ## 설치
 
-`release/usum-battle-tree-v3.1.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
+`release/usum-battle-tree-v3.2.apk`를 휴대폰에 받아 설치합니다(“출처를 알 수 없는 앱” 허용 필요, Android 7.0 이상).
 
 ## 출처
 
@@ -36,6 +36,10 @@ python3 tools/extract_usum.py       # Tree-Sets + PokeAPI -> app/src/main/assets
 - bw2 배틀서브웨이 프로젝트(`../bw2-factory`)와 **완전히 독립**된 별도 프로젝트입니다.
 - Gen5 엔진을 가져오면서 **페어리 타입(id 17)**을 타입 상성표(18×18)에 추가했고, 도구 id를 PokeAPI 체계로 재정의했습니다.
 - Rotom·Oricorio·Lycanroc의 폼 세트는 기본 폼으로 매핑. 메가 포켓몬은 스프라이트가 기본 폼을 재사용(종족치·타입·특성은 메가로 변경).
+
+## v3.2 변경점
+
+- **고스트다이브(Phantom Force) 구현** — 2턴 기술로, 1턴째에 모습을 감춰 상대의 공격을 모두 회피하고(땅파기·공중날기와 달리 예외 없이 전부 회피) 2턴째에 공격합니다. 공격 시 상대의 **방어·판별을 무시**합니다. 추출 데이터상 effect가 `NONE`이라 작동하지 않던 것을 `PHANTOM_FORCE`로 구현
 
 ## v3.1 변경점
 

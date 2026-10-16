@@ -689,6 +689,8 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "low_kick": "INCREASE_POWER_WITH_WEIGHT", "return": "POWER_BASED_ON_FRIENDSHIP",
         "frustration": "POWER_BASED_ON_LOW_FRIENDSHIP", "final_gambit": "FINAL_GAMBIT",
         "pursuit": "HIT_BEFORE_SWITCH", "fly": "FLY", "dig": "DIG", "dive": "DIVE",
+        # Phantom Force / Shadow Force: 2-turn vanish like Dig, but ignores Protect on the strike.
+        "phantom_force": "PHANTOM_FORCE", "shadow_force": "PHANTOM_FORCE",
         "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
         "future_sight": "HIT_IN_3_TURNS", "doom_desire": "HIT_IN_3_TURNS",

@@ -937,7 +937,7 @@ class Battle(
             if (m.status != Status.SLEEP) { msg("하지만 실패했다!"); recordMove(m, move); return }
             val opts = m.moves.map { it.move }.filter {
                 it.effect !in setOf("USE_RANDOM_LEARNED_MOVE_SLEEP", "USE_LAST_USED_MOVE") && !it.has("CHARGE") &&
-                    it.effect !in setOf("FLY", "DIG", "DIVE", "SKIP_CHARGE_TURN_IN_SUN", "CHARGE_TURN_HIGH_CRIT_FLINCH", "HIT_LAST_WHIFF_IF_HIT", "RECHARGE_AFTER")
+                    it.effect !in setOf("FLY", "DIG", "DIVE", "PHANTOM_FORCE", "SKIP_CHARGE_TURN_IN_SUN", "CHARGE_TURN_HIGH_CRIT_FLINCH", "HIT_LAST_WHIFF_IF_HIT", "RECHARGE_AFTER")
             }
             if (opts.isEmpty()) { msg("하지만 실패했다!"); recordMove(m, move); return }
             recordMove(m, move)
@@ -972,7 +972,7 @@ class Battle(
         val e = move.effect
         val secondTurn = m.chargingMove?.id == move.id
         // ---- two-turn moves: first turn
-        if (!secondTurn && e in setOf("FLY", "DIG", "DIVE", "SKIP_CHARGE_TURN_IN_SUN", "CHARGE_TURN_HIGH_CRIT_FLINCH")) {
+        if (!secondTurn && e in setOf("FLY", "DIG", "DIVE", "PHANTOM_FORCE", "SKIP_CHARGE_TURN_IN_SUN", "CHARGE_TURN_HIGH_CRIT_FLINCH")) {
             val skip = (e == "SKIP_CHARGE_TURN_IN_SUN" && effWeather() == Weather.SUN)
             if (!skip) {
                 msg("${nm(m)}의 ${mvName(move)}!")
@@ -980,6 +980,7 @@ class Battle(
                     "FLY" -> msg("${Josa.eunNeun(nm(m))} 하늘 높이 날아올랐다!")
                     "DIG" -> msg("${Josa.eunNeun(nm(m))} 구멍을 파서 땅속으로 숨었다!")
                     "DIVE" -> msg("${Josa.eunNeun(nm(m))} 물속으로 숨었다!")
+                    "PHANTOM_FORCE" -> msg("${Josa.eunNeun(nm(m))} 모습을 감췄다!")
                     "SKIP_CHARGE_TURN_IN_SUN" -> msg("${Josa.eunNeun(nm(m))} 빛을 흡수했다!")
                     else -> msg("${Josa.eunNeun(nm(m))} 빛에 휩싸였다!")
                 }
@@ -993,6 +994,7 @@ class Battle(
                         "FLY" -> m.semiInvulnerable = "FLY"
                         "DIG" -> m.semiInvulnerable = "DIG"
                         "DIVE" -> m.semiInvulnerable = "DIVE"
+                        "PHANTOM_FORCE" -> m.semiInvulnerable = "PHANTOM"
                     }
                     if (m.semiInvulnerable != null) emit(BattleEvent.Hidden(m.side, true))
                     return
@@ -1115,6 +1117,7 @@ class Battle(
             "FLY" -> move.key in setOf("thunder", "twister", "sky_uppercut", "gust")
             "DIG" -> move.key in setOf("earthquake", "fissure", "magnitude")
             "DIVE" -> move.key in setOf("surf", "whirlpool")
+            "PHANTOM" -> false  // Phantom Force: nothing can hit the user while it's vanished
             else -> true
         }
     }
