@@ -96,7 +96,14 @@ data class MegaForme(
     val sprite: Int = 0,
 )
 
-/** An HP-triggered battle forme (Darmanitan's Zen Mode). base = HP,Atk,Def,Spe,SpA,SpD. */
+/**
+ * An HP-triggered, reversible battle forme. base = HP,Atk,Def,Spe,SpA,SpD.
+ *  - Zen Mode (Darmanitan): ability ZEN_MODE, flips while HP <= 1/2 (whenLowHp = true).
+ *  - Schooling (Wishiwashi): ability SCHOOLING, flips to the School form while HP > 1/4 (whenLowHp =
+ *    false), and only at level 20+.
+ * [ability] and [whenLowHp]/[hpNumer]/[hpDenom]/[minLevel] default to Zen Mode's values so existing
+ * zen.json entries keep working.
+ */
 @Serializable
 data class ZenForme(
     val species: Int,
@@ -104,6 +111,17 @@ data class ZenForme(
     val types: List<Int>,
     val base: List<Int>,
     val sprite: Int = 0,
+    /** Engine ability id that drives this forme (161 = Zen Mode). */
+    val ability: Int = 161,
+    /** true: flip when HP <= threshold (Zen); false: flip when HP > threshold (Schooling). */
+    val whenLowHp: Boolean = true,
+    /** HP threshold as hpNumer/hpDenom of max HP (Zen = 1/2, Schooling = 1/4). */
+    val hpNumer: Int = 1,
+    val hpDenom: Int = 2,
+    /** Minimum level for the forme change (Schooling needs level 20+). */
+    val minLevel: Int = 1,
+    /** Message shown when the forme activates. */
+    val activateMsg: String = "달마모드가 되었다!",
 )
 
 /** Korean display name for a type's damaging Z-move (Gen 7), keyed by engine type id. */

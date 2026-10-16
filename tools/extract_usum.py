@@ -484,6 +484,24 @@ def main():
             })
             download_pixel_sprites(zdata["id"])
 
+    # HP-triggered Schooling forme (Wishiwashi, species 746): the School form appears while HP > 1/4
+    # (level 20+), granting far higher stats. Modeled with the same reversible-forme mechanism as Zen
+    # Mode but with whenLowHp=False and a 1/4 threshold.
+    if 746 in species_set_ids:
+        sdata = api_get("pokemon/wishiwashi-school")
+        if sdata:
+            stypes = [TYPE_ID[t["type"]["name"].capitalize()] for t in sorted(sdata["types"], key=lambda x: x["slot"])
+                      if t["type"]["name"].capitalize() in TYPE_ID]
+            sbs = {s["stat"]["name"]: s["base_stat"] for s in sdata["stats"]}
+            zen_out.append({
+                "species": 746, "nameKo": "약어리(군집)", "types": stypes,
+                "base": [sbs["hp"], sbs["attack"], sbs["defense"], sbs["speed"], sbs["special-attack"], sbs["special-defense"]],
+                "sprite": sdata["id"],
+                "ability": 208, "whenLowHp": False, "hpNumer": 1, "hpDenom": 4, "minLevel": 20,
+                "activateMsg": "군집을 이뤘다!",
+            })
+            download_pixel_sprites(sdata["id"])
+
     # Type-based Z-move display names (Gen 7). A damaging move used as a Z-move is announced under the
     # name of its type's Z-move (e.g. Fire -> 다이내믹풀플레임). Built from the PokeAPI CSV dumps so it
     # needs no network access. Z-move entries occupy ids 622-657 (physical/even, special/odd per type).

@@ -682,23 +682,29 @@ class Battle(
     }
 
     /**
-     * Darmanitan's Zen Mode: with the Zen Mode ability, it flips to its Zen forme (Fire/Psychic, SpA
-     * stats) while HP <= 1/2 and back to the base forme when HP rises above 1/2. HP is unchanged by the
-     * flip. Called after any HP change (hpTriggers) and on entry.
+     * HP-triggered reversible formes (Darmanitan's Zen Mode, Wishiwashi's Schooling). A forme entry in
+     * zen.json names the driving ability and the HP threshold/direction:
+     *  - Zen Mode: flips to the Zen forme while HP <= 1/2.
+     *  - Schooling: flips to the School form while HP > 1/4 (and only at level 20+); drops back to the
+     *    weak Solo form once HP falls to 1/4 or below.
+     * HP is unchanged by the flip. Called after any HP change (hpTriggers) and on entry.
      */
     private suspend fun checkZenMode(m: BattleMon) {
-        if (ability(m) != Ab.ZEN_MODE) return
-        val zen = data.zenBySpecies[m.species.id] ?: return
-        val shouldBeZen = m.hp * 2 <= m.maxHp
-        if (shouldBeZen == m.zenActive) return
-        if (shouldBeZen) {
+        val forme = data.zenBySpecies[m.species.id] ?: return
+        if (ability(m) != forme.ability) return
+        if (m.level < forme.minLevel) return
+        // Compare HP*denom vs maxHp*numer to avoid integer division.
+        val belowOrEqual = m.hp * forme.hpDenom <= m.maxHp * forme.hpNumer
+        val shouldActivate = if (forme.whenLowHp) belowOrEqual else !belowOrEqual
+        if (shouldActivate == m.zenActive) return
+        if (shouldActivate) {
             m.zenActive = true
-            m.zenName = zen.nameKo
-            m.zenSprite = zen.sprite
-            m.types = zen.types.toMutableList()
+            m.zenName = forme.nameKo
+            m.zenSprite = forme.sprite
+            m.types = forme.types.toMutableList()
             val hp = m.stats[Stat.HP]
-            m.stats = m.info.statsFor(zen.base).also { it[Stat.HP] = hp }
-            msg("${Josa.eunNeun(nm(m))} 달마모드가 되었다!")
+            m.stats = m.info.statsFor(forme.base).also { it[Stat.HP] = hp }
+            msg("${Josa.eunNeun(nm(m))} ${forme.activateMsg}")
         } else {
             m.zenActive = false
             m.types = (m.megaTypes ?: m.species.types).toMutableList()
@@ -1758,6 +1764,9 @@ class Battle(
 
     private suspend fun secondary(m: BattleMon, t: BattleMon, move: MoveData, type: Int, total: Int) {
         val e = move.effect
+        // A Z-move is treated as a separate move: the base move's added effects (secondary status,
+        // flinch, and stat changes — including self-stat drops like Overheat/Draco Meteor) do NOT fire.
+        if (m.zMoveActive) return
         // Sheer Force removes the move's added effects (and already boosted its power).
         if (ability(m) == Ab.SHEER_FORCE && hasSecondary(move)) return
         val serene = if (ability(m) == Ab.SERENE_GRACE) 2 else 1

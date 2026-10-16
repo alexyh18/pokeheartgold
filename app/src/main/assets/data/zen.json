@@ -1,1 +1,1 @@
-[{"species":555,"nameKo":"불비달마(달마모드)","types":[9,13],"base":[105,30,105,55,140,105],"sprite":10017}]
+[{"species":555,"nameKo":"불비달마(달마모드)","types":[9,13],"base":[105,30,105,55,140,105],"sprite":10017},{"species":746,"nameKo":"약어리(군집)","types":[10],"base":[45,140,130,30,140,135],"sprite":10127,"ability":208,"whenLowHp":false,"hpNumer":1,"hpDenom":4,"minLevel":20,"activateMsg":"군집을 이뤘다!"}]
