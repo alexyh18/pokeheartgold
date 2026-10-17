@@ -696,7 +696,7 @@ def derive_effect(slug, category, meta_cat, ailment, drain, heal, stat_changes, 
         "blast_burn": "RECHARGE_AFTER", "hydro_cannon": "RECHARGE_AFTER", "frenzy_plant": "RECHARGE_AFTER",
         "roar_of_time": "RECHARGE_AFTER", "prismatic_laser": "RECHARGE_AFTER", "eternabeam": "RECHARGE_AFTER",
         "meteor_assault": "RECHARGE_AFTER",
-        "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
+        "solar_beam": "SKIP_CHARGE_TURN_IN_SUN", "solar_blade": "SKIP_CHARGE_TURN_IN_SUN", "focus_punch": "HIT_LAST_WHIFF_IF_HIT",
         "baton_pass": "PASS_STATS_AND_STATUS", "destiny_bond": "KO_MON_THAT_DEFEATED_USER",
         "future_sight": "HIT_IN_3_TURNS", "doom_desire": "HIT_IN_3_TURNS",
         # Trick / Switcheroo swap the two Pokémon's held items.

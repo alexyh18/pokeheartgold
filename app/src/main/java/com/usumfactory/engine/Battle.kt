@@ -1169,12 +1169,16 @@ class Battle(
             if (t.level > m.level) return false
             return rng.next(100) < move.accuracy + (m.level - t.level)
         }
-        if (move.effect == "THUNDER" && w == Weather.RAIN) return true
-        if (move.effect == "BLIZZARD" && w == Weather.HAIL) return true
+        // Weather-dependent accuracy (by move key, since these moves also carry a secondary effect):
+        //  - Thunder / Hurricane: never miss in rain, 50% accuracy in harsh sunlight.
+        //  - Blizzard: never misses in hail.
+        val rainPerfect = move.key in setOf("thunder", "hurricane")
+        if (rainPerfect && w == Weather.RAIN) return true
+        if (move.key == "blizzard" && w == Weather.HAIL) return true
         if (move.accuracy > 100) return true
         if (move.isStatus && move.accuracy == 0) return true
         var acc = move.accuracy
-        if (move.effect == "THUNDER" && w == Weather.SUN) acc = 50
+        if (rainPerfect && w == Weather.SUN) acc = 50
         val evaStage = if (t.foresighted) minOf(0, t.stages[Stat.EVA]) else t.stages[Stat.EVA]
         val stage = (m.stages[Stat.ACC] - evaStage).coerceIn(-6, 6)
         val num = if (stage > 0) 3 + stage else 3

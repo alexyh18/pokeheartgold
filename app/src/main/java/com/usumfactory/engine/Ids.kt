@@ -103,6 +103,8 @@ object Ab {
     const val ICE_BODY = 115
     const val SOLID_ROCK = 116
     const val SNOW_WARNING = 117
+    const val DRIZZLE = 2
+    const val DROUGHT = 70
     const val FRISK = 119
     const val RECKLESS = 120
     const val SHEER_FORCE = 125
